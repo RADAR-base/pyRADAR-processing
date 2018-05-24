@@ -1,0 +1,257 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module radar.project</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong><a href="radar.html"><font color="#ffffff">radar</font></a>.project</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:/home/ubuntu/pyradarcns/radar/project.py">/home/ubuntu/pyradarcns/radar/project.py</a></font></td></tr></table>
+    <p></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Modules</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="glob.html">glob</a><br>
+<a href="os.html">os</a><br>
+</td><td width="25%" valign=top><a href="pandas.html">pandas</a><br>
+<a href="tables.html">tables</a><br>
+</td><td width="25%" valign=top><a href="radar.visualise.html">radar.visualise</a><br>
+</td><td width="25%" valign=top></td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ee77aa">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Classes</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#ee77aa"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl>
+<dt><font face="helvetica, arial"><a href="builtins.html#dict">builtins.dict</a>(<a href="builtins.html#object">builtins.object</a>)
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="radar.project.html#ParticipantData">ParticipantData</a>
+</font></dt></dl>
+</dd>
+<dt><font face="helvetica, arial"><a href="builtins.html#object">builtins.object</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="radar.project.html#Participant">Participant</a>
+</font></dt><dt><font face="helvetica, arial"><a href="radar.project.html#Project">Project</a>
+</font></dt></dl>
+</dd>
+</dl>
+ <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Participant">class <strong>Participant</strong></a>(<a href="builtins.html#object">builtins.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;class&nbsp;to&nbsp;hold&nbsp;data&nbsp;and&nbsp;methods&nbsp;concerning&nbsp;participants/subjects&nbsp;in&nbsp;a<br>
+RADAR&nbsp;trial.&nbsp;Typically&nbsp;intialised&nbsp;by&nbsp;opening&nbsp;a&nbsp;<a href="#Project">Project</a>.<br>
+Initialisation&nbsp;parameters<br>
+__________<br>
+hdf:&nbsp;tables.Group<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;pytables&nbsp;group&nbsp;<a href="builtins.html#object">object</a>&nbsp;that&nbsp;contains&nbsp;the&nbsp;data&nbsp;relating&nbsp;to&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;participant.<br>
+name:&nbsp;str&nbsp;(optional)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;participant.&nbsp;If&nbsp;not&nbsp;given&nbsp;it&nbsp;will&nbsp;take&nbsp;a&nbsp;name&nbsp;from&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;hdf&nbsp;group<br>
+parent:&nbsp;radar.<a href="#Project">Project</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;parent&nbsp;project&nbsp;of&nbsp;the&nbsp;participant.<br>
+&nbsp;<br>
+Objects<br>
+_______<br>
+data:&nbsp;<a href="#ParticipantData">ParticipantData</a>&nbsp;(<a href="builtins.html#dict">dict</a>&nbsp;subclass)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;dictionary&nbsp;containing&nbsp;each&nbsp;data&nbsp;table&nbsp;in&nbsp;the&nbsp;hdf&nbsp;for&nbsp;the&nbsp;participant.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;It&nbsp;has&nbsp;ease-of-use&nbsp;methods&nbsp;for&nbsp;using&nbsp;the&nbsp;data.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;See&nbsp;also:&nbsp;radar.wrappers.<a href="#ParticipantData">ParticipantData</a><br>
+info:&nbsp;NotImplemented&nbsp;-&nbsp;will&nbsp;contain&nbsp;info&nbsp;pertaining&nbsp;to&nbsp;the&nbsp;participant<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(sex,&nbsp;age,&nbsp;etc)<br>
+labels:&nbsp;NotImplemented&nbsp;-&nbsp;will&nbsp;contain&nbsp;event&nbsp;labels&nbsp;/&nbsp;times&nbsp;for&nbsp;the&nbsp;data<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="Participant-__init__"><strong>__init__</strong></a>(self, hdf, **kwargs)</dt><dd><tt>Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</tt></dd></dl>
+
+<dl><dt><a name="Participant-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><tt>Return&nbsp;repr(self).</tt></dd></dl>
+
+<dl><dt><a name="Participant-plot_time_span"><strong>plot_time_span</strong></a>(self, source, timespan, ycols, xcol='value.time', fig=None, events=None)</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="ParticipantData">class <strong>ParticipantData</strong></a>(<a href="builtins.html#dict">builtins.dict</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt><a href="builtins.html#dict">dict</a>()&nbsp;-&gt;&nbsp;new&nbsp;empty&nbsp;dictionary<br>
+<a href="builtins.html#dict">dict</a>(mapping)&nbsp;-&gt;&nbsp;new&nbsp;dictionary&nbsp;initialized&nbsp;from&nbsp;a&nbsp;mapping&nbsp;<a href="builtins.html#object">object</a>'s<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(key,&nbsp;value)&nbsp;pairs<br>
+<a href="builtins.html#dict">dict</a>(iterable)&nbsp;-&gt;&nbsp;new&nbsp;dictionary&nbsp;initialized&nbsp;as&nbsp;if&nbsp;via:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;d&nbsp;=&nbsp;{}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;k,&nbsp;v&nbsp;in&nbsp;iterable:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;d[k]&nbsp;=&nbsp;v<br>
+<a href="builtins.html#dict">dict</a>(**kwargs)&nbsp;-&gt;&nbsp;new&nbsp;dictionary&nbsp;initialized&nbsp;with&nbsp;the&nbsp;name=value&nbsp;pairs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;in&nbsp;the&nbsp;keyword&nbsp;argument&nbsp;list.&nbsp;&nbsp;For&nbsp;example:&nbsp;&nbsp;<a href="builtins.html#dict">dict</a>(one=1,&nbsp;two=2)<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="radar.project.html#ParticipantData">ParticipantData</a></dd>
+<dd><a href="builtins.html#dict">builtins.dict</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="ParticipantData-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><tt>Return&nbsp;repr(self).</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-available"><strong>available</strong></a>(self)</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#dict">builtins.dict</a>:<br>
+<dl><dt><a name="ParticipantData-__contains__"><strong>__contains__</strong></a>(self, key, /)</dt><dd><tt>True&nbsp;if&nbsp;D&nbsp;has&nbsp;a&nbsp;key&nbsp;k,&nbsp;else&nbsp;False.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__delitem__"><strong>__delitem__</strong></a>(self, key, /)</dt><dd><tt>Delete&nbsp;self[key].</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__eq__"><strong>__eq__</strong></a>(self, value, /)</dt><dd><tt>Return&nbsp;self==value.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__ge__"><strong>__ge__</strong></a>(self, value, /)</dt><dd><tt>Return&nbsp;self&gt;=value.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><tt>Return&nbsp;getattr(self,&nbsp;name).</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__getitem__"><strong>__getitem__</strong></a>(...)</dt><dd><tt>x.<a href="#ParticipantData-__getitem__">__getitem__</a>(y)&nbsp;&lt;==&gt;&nbsp;x[y]</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__gt__"><strong>__gt__</strong></a>(self, value, /)</dt><dd><tt>Return&nbsp;self&gt;value.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__init__"><strong>__init__</strong></a>(self, /, *args, **kwargs)</dt><dd><tt>Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__iter__"><strong>__iter__</strong></a>(self, /)</dt><dd><tt>Implement&nbsp;iter(self).</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__le__"><strong>__le__</strong></a>(self, value, /)</dt><dd><tt>Return&nbsp;self&lt;=value.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__len__"><strong>__len__</strong></a>(self, /)</dt><dd><tt>Return&nbsp;len(self).</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__lt__"><strong>__lt__</strong></a>(self, value, /)</dt><dd><tt>Return&nbsp;self&lt;value.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__ne__"><strong>__ne__</strong></a>(self, value, /)</dt><dd><tt>Return&nbsp;self!=value.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__new__"><strong>__new__</strong></a>(*args, **kwargs)<font color="#909090"><font face="helvetica, arial"> from <a href="builtins.html#type">builtins.type</a></font></font></dt><dd><tt>Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;<a href="builtins.html#object">object</a>.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__setitem__"><strong>__setitem__</strong></a>(self, key, value, /)</dt><dd><tt>Set&nbsp;self[key]&nbsp;to&nbsp;value.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-__sizeof__"><strong>__sizeof__</strong></a>(...)</dt><dd><tt>D.<a href="#ParticipantData-__sizeof__">__sizeof__</a>()&nbsp;-&gt;&nbsp;size&nbsp;of&nbsp;D&nbsp;in&nbsp;memory,&nbsp;in&nbsp;bytes</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-clear"><strong>clear</strong></a>(...)</dt><dd><tt>D.<a href="#ParticipantData-clear">clear</a>()&nbsp;-&gt;&nbsp;None.&nbsp;&nbsp;Remove&nbsp;all&nbsp;items&nbsp;from&nbsp;D.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-copy"><strong>copy</strong></a>(...)</dt><dd><tt>D.<a href="#ParticipantData-copy">copy</a>()&nbsp;-&gt;&nbsp;a&nbsp;shallow&nbsp;copy&nbsp;of&nbsp;D</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-fromkeys"><strong>fromkeys</strong></a>(iterable, value=None, /)<font color="#909090"><font face="helvetica, arial"> from <a href="builtins.html#type">builtins.type</a></font></font></dt><dd><tt>Returns&nbsp;a&nbsp;new&nbsp;<a href="builtins.html#dict">dict</a>&nbsp;with&nbsp;keys&nbsp;from&nbsp;iterable&nbsp;and&nbsp;values&nbsp;equal&nbsp;to&nbsp;value.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-get"><strong>get</strong></a>(...)</dt><dd><tt>D.<a href="#ParticipantData-get">get</a>(k[,d])&nbsp;-&gt;&nbsp;D[k]&nbsp;if&nbsp;k&nbsp;in&nbsp;D,&nbsp;else&nbsp;d.&nbsp;&nbsp;d&nbsp;defaults&nbsp;to&nbsp;None.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-items"><strong>items</strong></a>(...)</dt><dd><tt>D.<a href="#ParticipantData-items">items</a>()&nbsp;-&gt;&nbsp;a&nbsp;set-like&nbsp;<a href="builtins.html#object">object</a>&nbsp;providing&nbsp;a&nbsp;view&nbsp;on&nbsp;D's&nbsp;items</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-keys"><strong>keys</strong></a>(...)</dt><dd><tt>D.<a href="#ParticipantData-keys">keys</a>()&nbsp;-&gt;&nbsp;a&nbsp;set-like&nbsp;<a href="builtins.html#object">object</a>&nbsp;providing&nbsp;a&nbsp;view&nbsp;on&nbsp;D's&nbsp;keys</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-pop"><strong>pop</strong></a>(...)</dt><dd><tt>D.<a href="#ParticipantData-pop">pop</a>(k[,d])&nbsp;-&gt;&nbsp;v,&nbsp;remove&nbsp;specified&nbsp;key&nbsp;and&nbsp;return&nbsp;the&nbsp;corresponding&nbsp;value.<br>
+If&nbsp;key&nbsp;is&nbsp;not&nbsp;found,&nbsp;d&nbsp;is&nbsp;returned&nbsp;if&nbsp;given,&nbsp;otherwise&nbsp;KeyError&nbsp;is&nbsp;raised</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-popitem"><strong>popitem</strong></a>(...)</dt><dd><tt>D.<a href="#ParticipantData-popitem">popitem</a>()&nbsp;-&gt;&nbsp;(k,&nbsp;v),&nbsp;remove&nbsp;and&nbsp;return&nbsp;some&nbsp;(key,&nbsp;value)&nbsp;pair&nbsp;as&nbsp;a<br>
+2-tuple;&nbsp;but&nbsp;raise&nbsp;KeyError&nbsp;if&nbsp;D&nbsp;is&nbsp;empty.</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-setdefault"><strong>setdefault</strong></a>(...)</dt><dd><tt>D.<a href="#ParticipantData-setdefault">setdefault</a>(k[,d])&nbsp;-&gt;&nbsp;D.<a href="#ParticipantData-get">get</a>(k,d),&nbsp;also&nbsp;set&nbsp;D[k]=d&nbsp;if&nbsp;k&nbsp;not&nbsp;in&nbsp;D</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-update"><strong>update</strong></a>(...)</dt><dd><tt>D.<a href="#ParticipantData-update">update</a>([E,&nbsp;]**F)&nbsp;-&gt;&nbsp;None.&nbsp;&nbsp;Update&nbsp;D&nbsp;from&nbsp;<a href="builtins.html#dict">dict</a>/iterable&nbsp;E&nbsp;and&nbsp;F.<br>
+If&nbsp;E&nbsp;is&nbsp;present&nbsp;and&nbsp;has&nbsp;a&nbsp;.<a href="#ParticipantData-keys">keys</a>()&nbsp;method,&nbsp;then&nbsp;does:&nbsp;&nbsp;for&nbsp;k&nbsp;in&nbsp;E:&nbsp;D[k]&nbsp;=&nbsp;E[k]<br>
+If&nbsp;E&nbsp;is&nbsp;present&nbsp;and&nbsp;lacks&nbsp;a&nbsp;.<a href="#ParticipantData-keys">keys</a>()&nbsp;method,&nbsp;then&nbsp;does:&nbsp;&nbsp;for&nbsp;k,&nbsp;v&nbsp;in&nbsp;E:&nbsp;D[k]&nbsp;=&nbsp;v<br>
+In&nbsp;either&nbsp;case,&nbsp;this&nbsp;is&nbsp;followed&nbsp;by:&nbsp;for&nbsp;k&nbsp;in&nbsp;F:&nbsp;&nbsp;D[k]&nbsp;=&nbsp;F[k]</tt></dd></dl>
+
+<dl><dt><a name="ParticipantData-values"><strong>values</strong></a>(...)</dt><dd><tt>D.<a href="#ParticipantData-values">values</a>()&nbsp;-&gt;&nbsp;an&nbsp;<a href="builtins.html#object">object</a>&nbsp;providing&nbsp;a&nbsp;view&nbsp;on&nbsp;D's&nbsp;values</tt></dd></dl>
+
+<hr>
+Data and other attributes inherited from <a href="builtins.html#dict">builtins.dict</a>:<br>
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Project">class <strong>Project</strong></a>(<a href="builtins.html#object">builtins.object</a>)</font></td></tr>
+    
+<tr><td bgcolor="#ffc8d8"><tt>&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="Project-__del__"><strong>__del__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Project-__init__"><strong>__init__</strong></a>(self, hdf, mode='r', **kwargs)</dt><dd><tt>Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</tt></dd></dl>
+
+<dl><dt><a name="Project-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><tt>Return&nbsp;repr(self).</tt></dd></dl>
+
+<dl><dt><a name="Project-__str__"><strong>__str__</strong></a>(self)</dt><dd><tt>Return&nbsp;str(self).</tt></dd></dl>
+
+<dl><dt><a name="Project-add_participant"><strong>add_participant</strong></a>(self, name, subproject=None)</dt></dl>
+
+<dl><dt><a name="Project-map_participants"><strong>map_participants</strong></a>(self, func, *args, **kwargs)</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#eeaa77">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt><a name="-participant_from_csvs"><strong>participant_from_csvs</strong></a>(project_file, where, name, folder_path, schemas:radar.util.avro.ProjectSchemas, specifications:radar.util.specifications.ProjectSpecs, use_schemas:bool=True, use_specs:bool=False, load_only_schemas:bool=False, participant_subfolders=False, custom_subfolder='')</dt></dl>
+ <dl><dt><a name="-project_from_csvs"><strong>project_from_csvs</strong></a>(folder_path:str, project_file:str=None, subprojects:list=None, schemas:radar.util.avro.ProjectSchemas=None, specifications:radar.util.specifications.ProjectSpecs=None, use_schemas:bool=False, use_specs:bool=False, load_only_schemas:bool=False)</dt><dd><tt>Creates&nbsp;a&nbsp;RADAR&nbsp;project&nbsp;HDF5&nbsp;file&nbsp;containing&nbsp;data&nbsp;from&nbsp;CSV&nbsp;files.<br>
+The&nbsp;filesystem&nbsp;folders&nbsp;should&nbsp;be&nbsp;organised&nbsp;as&nbsp;in&nbsp;the&nbsp;RADAR-CNS&nbsp;FTP,&nbsp;with&nbsp;a<br>
+project&nbsp;folder&nbsp;containing&nbsp;participant&nbsp;folders,&nbsp;which&nbsp;each&nbsp;contain&nbsp;data<br>
+source/modality&nbsp;folders&nbsp;with&nbsp;CSV&nbsp;files&nbsp;inside.<br>
+Subprojects&nbsp;may&nbsp;be&nbsp;specified&nbsp;if&nbsp;the&nbsp;top&nbsp;level&nbsp;directory&nbsp;does&nbsp;not<br>
+contain&nbsp;participants&nbsp;as&nbsp;child&nbsp;folders<br>
+&nbsp;<br>
+Parameters<br>
+__________<br>
+project_file&nbsp;(required):&nbsp;str&nbsp;or&nbsp;radar.io.hdf5.ProjectFile<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;HDF5&nbsp;file&nbsp;to&nbsp;copy&nbsp;data&nbsp;in&nbsp;to.<br>
+folder_path&nbsp;(required):&nbsp;str<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Path&nbsp;to&nbsp;the&nbsp;filesystem&nbsp;project&nbsp;directory<br>
+subprojects&nbsp;(optional):&nbsp;list&nbsp;or&nbsp;None<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;list&nbsp;of&nbsp;subprojects&nbsp;to&nbsp;look&nbsp;for&nbsp;participants&nbsp;in.&nbsp;Paths&nbsp;relative&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;folder_path.<br>
+specifications&nbsp;(optional):&nbsp;<a href="builtins.html#dict">dict</a>&nbsp;/&nbsp;radar.util.avro.ProjectSchemas<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;dictionary&nbsp;containing&nbsp;schema&nbsp;names&nbsp;and&nbsp;the&nbsp;associated&nbsp;RadarSchema<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="builtins.html#object">object</a>.&nbsp;Default&nbsp;uses&nbsp;default&nbsp;package&nbsp;specifications.<br>
+specs_only&nbsp;(optional):&nbsp;Bool<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Whether&nbsp;to&nbsp;only&nbsp;load&nbsp;data&nbsp;from&nbsp;modalities&nbsp;with&nbsp;a&nbsp;known&nbsp;specification.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;False,&nbsp;the&nbsp;datatype&nbsp;will&nbsp;be&nbsp;inferred.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Default&nbsp;is&nbsp;True<br>
+Returns<br>
+_______<br>
+<a href="#Project">Project</a>:&nbsp;radar.wrappers.<a href="#Project">Project</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;RADAR&nbsp;project&nbsp;wrapper&nbsp;around&nbsp;the&nbsp;new&nbsp;HDF5&nbsp;file.</tt></dd></dl>
+</td></tr></table>
+</body></html>

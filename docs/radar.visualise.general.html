@@ -1,0 +1,50 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module radar.visualise.general</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong><a href="radar.html"><font color="#ffffff">radar</font></a>.<a href="radar.visualise.html"><font color="#ffffff">visualise</font></a>.general</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:/home/ubuntu/pyradarcns/radar/visualise/general.py">/home/ubuntu/pyradarcns/radar/visualise/general.py</a></font></td></tr></table>
+    <p></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Modules</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="matplotlib.pyplot.html">matplotlib.pyplot</a><br>
+</td><td width="25%" valign=top></td><td width="25%" valign=top></td><td width="25%" valign=top></td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#eeaa77">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt><a name="-group_plot"><strong>group_plot</strong></a>(dataframe, ycols, groupby, xcol=None, **plotkwargs)</dt></dl>
+ <dl><dt><a name="-time_view"><strong>time_view</strong></a>(dataframes, timeframe, ycols, y2cols=None, xcol=None, titles=None, fig=None, **plotkwargs)</dt><dd><tt>Plots&nbsp;data&nbsp;columns&nbsp;from&nbsp;Pandas&nbsp;dataframes&nbsp;at&nbsp;a&nbsp;certain&nbsp;time&nbsp;interval<br>
+&nbsp;<br>
+Parameters<br>
+__________<br>
+dataframes&nbsp;:&nbsp;list<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;pandas&nbsp;dataframes&nbsp;with&nbsp;a&nbsp;timestamp&nbsp;index.&nbsp;(Alternatively,&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;shared&nbsp;x-axis&nbsp;column&nbsp;name&nbsp;supplied&nbsp;by&nbsp;xcol)<br>
+timeframe:&nbsp;tuple<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Two&nbsp;strings&nbsp;containing&nbsp;the&nbsp;start&nbsp;and&nbsp;end&nbsp;date/time&nbsp;of&nbsp;the&nbsp;plot<br>
+ycols:&nbsp;list<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;list&nbsp;of&nbsp;the&nbsp;dataframe&nbsp;column&nbsp;names.&nbsp;Each&nbsp;element&nbsp;of&nbsp;the&nbsp;list<br>
+&nbsp;&nbsp;&nbsp;&nbsp;corresponds&nbsp;to&nbsp;one&nbsp;subplot.&nbsp;Each&nbsp;element&nbsp;contains&nbsp;a&nbsp;list&nbsp;of&nbsp;&nbsp;the&nbsp;names&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;columns&nbsp;for&nbsp;the&nbsp;corresponding&nbsp;dataframe.<br>
+y2cols:&nbsp;list<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;same&nbsp;as&nbsp;ycols,&nbsp;but&nbsp;plotted&nbsp;on&nbsp;a&nbsp;second&nbsp;y-axis<br>
+xcol:&nbsp;str<br>
+&nbsp;&nbsp;&nbsp;&nbsp;An&nbsp;optional&nbsp;string&nbsp;specifying&nbsp;the&nbsp;x-axis&nbsp;column&nbsp;of&nbsp;each&nbsp;dataframe&nbsp;if<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;index&nbsp;is&nbsp;not&nbsp;used.<br>
+titles:&nbsp;list<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;strings&nbsp;for&nbsp;each&nbsp;subplot&nbsp;(dataframes)&nbsp;title.</tt></dd></dl>
+</td></tr></table>
+</body></html>

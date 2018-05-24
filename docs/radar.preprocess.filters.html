@@ -1,0 +1,76 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module radar.preprocess.filters</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong><a href="radar.html"><font color="#ffffff">radar</font></a>.<a href="radar.preprocess.html"><font color="#ffffff">preprocess</font></a>.filters</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:/home/ubuntu/pyradarcns/radar/preprocess/filters.py">/home/ubuntu/pyradarcns/radar/preprocess/filters.py</a></font></td></tr></table>
+    <p></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Modules</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="pandas.html">pandas</a><br>
+</td><td width="25%" valign=top><a href="scipy.signal.html">scipy.signal</a><br>
+</td><td width="25%" valign=top></td><td width="25%" valign=top></td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#eeaa77">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt><a name="-accel_gravity"><strong>accel_gravity</strong></a>(accel_array, freq)</dt><dd><tt>accel_gravity&nbsp;runs&nbsp;a&nbsp;filter&nbsp;on&nbsp;the&nbsp;input&nbsp;array(s)&nbsp;to&nbsp;extract<br>
+the&nbsp;gravitational&nbsp;component.&nbsp;Uses&nbsp;a&nbsp;two-pass&nbsp;Butterworth&nbsp;filter&nbsp;with<br>
+cutoff&nbsp;=&nbsp;0.5Hz,&nbsp;order=5<br>
+Parameters<br>
+__________<br>
+accel_array&nbsp;:&nbsp;list(s)&nbsp;or&nbsp;numpy&nbsp;array(s)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;acceleration&nbsp;data&nbsp;that&nbsp;the&nbsp;filter&nbsp;will&nbsp;be&nbsp;applied&nbsp;to.&nbsp;Can&nbsp;be&nbsp;single<br>
+&nbsp;&nbsp;&nbsp;&nbsp;or&nbsp;multiple&nbsp;vectors.&nbsp;Each&nbsp;dimension&nbsp;is&nbsp;treated&nbsp;as&nbsp;a&nbsp;seperate<br>
+&nbsp;&nbsp;&nbsp;&nbsp;accelerometer&nbsp;vector.&nbsp;Vectors&nbsp;should&nbsp;be&nbsp;in&nbsp;rows&nbsp;for&nbsp;numpy&nbsp;arrays&nbsp;but<br>
+&nbsp;&nbsp;&nbsp;&nbsp;columns&nbsp;for&nbsp;pandas&nbsp;DataFrames<br>
+freq:&nbsp;float<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;frequency&nbsp;(Hz)&nbsp;of&nbsp;the&nbsp;accelerometer<br>
+Returns<br>
+_______<br>
+gravity:&nbsp;type(accel_array)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;gravity&nbsp;as&nbsp;predicted&nbsp;by&nbsp;the&nbsp;lowpass&nbsp;filter</tt></dd></dl>
+ <dl><dt><a name="-accel_linear"><strong>accel_linear</strong></a>(accel_array, freq)</dt><dd><tt>acceleration_gravity&nbsp;runs&nbsp;a&nbsp;filter&nbsp;on&nbsp;the&nbsp;input&nbsp;array(s)&nbsp;to&nbsp;remove&nbsp;the<br>
+gravitational&nbsp;component&nbsp;and&nbsp;return&nbsp;linear&nbsp;acceleration.&nbsp;Uses&nbsp;a&nbsp;two-pass<br>
+Butterworth&nbsp;filter&nbsp;with&nbsp;cutoff&nbsp;=&nbsp;0.5Hz,&nbsp;order=5<br>
+Parameters<br>
+__________<br>
+accel_array&nbsp;:&nbsp;list(s)&nbsp;or&nbsp;numpy&nbsp;array(s)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;acceleration&nbsp;data&nbsp;that&nbsp;the&nbsp;filter&nbsp;will&nbsp;be&nbsp;applied&nbsp;to.&nbsp;Can&nbsp;be&nbsp;single<br>
+&nbsp;&nbsp;&nbsp;&nbsp;or&nbsp;multiple&nbsp;vectors.&nbsp;Each&nbsp;dimension&nbsp;is&nbsp;treated&nbsp;as&nbsp;a&nbsp;seperate<br>
+&nbsp;&nbsp;&nbsp;&nbsp;accelerometer&nbsp;vector.&nbsp;Vectors&nbsp;should&nbsp;be&nbsp;in&nbsp;rows&nbsp;for&nbsp;numpy&nbsp;arrays&nbsp;but<br>
+&nbsp;&nbsp;&nbsp;&nbsp;columns&nbsp;for&nbsp;pandas&nbsp;DataFrames<br>
+freq:&nbsp;float<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;frequency&nbsp;(Hz)&nbsp;of&nbsp;the&nbsp;accelerometer<br>
+Returns<br>
+_______<br>
+linear_accel:&nbsp;type(accel_array)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;linear&nbsp;acceleration&nbsp;as&nbsp;predicted&nbsp;by&nbsp;the&nbsp;highpass&nbsp;filter</tt></dd></dl>
+ <dl><dt><a name="-butterworth"><strong>butterworth</strong></a>(arr, cutoff, freq, order=5, ftype='highpass')</dt><dd><tt>butterworth&nbsp;filters&nbsp;the&nbsp;array&nbsp;through&nbsp;a&nbsp;two-pass&nbsp;butterworth&nbsp;filter.<br>
+Parameters<br>
+__________<br>
+arr:&nbsp;list&nbsp;or&nbsp;numpy.array<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;timeseries&nbsp;array&nbsp;on&nbsp;which&nbsp;the&nbsp;filter&nbsp;is&nbsp;applied<br>
+cutoff:&nbsp;scalar&nbsp;or&nbsp;len-2&nbsp;sequence<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;critical&nbsp;frequencies&nbsp;for&nbsp;the&nbsp;Butterworth&nbsp;filter.&nbsp;The&nbsp;point&nbsp;at<br>
+&nbsp;&nbsp;&nbsp;&nbsp;which&nbsp;the&nbsp;gain&nbsp;drops&nbsp;to&nbsp;1/sqrt(2)&nbsp;of&nbsp;the&nbsp;passband.&nbsp;Must&nbsp;be&nbsp;length-2<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sequence&nbsp;for&nbsp;a&nbsp;bandpass&nbsp;filter&nbsp;giving&nbsp;[low,&nbsp;high].&nbsp;Or&nbsp;else&nbsp;the&nbsp;scalar<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cutoff&nbsp;frequency&nbsp;for&nbsp;either&nbsp;a&nbsp;low-pass'&nbsp;or&nbsp;'highpass'&nbsp;filter.<br>
+freq:&nbsp;float<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;frequency&nbsp;(Hz)&nbsp;of&nbsp;the&nbsp;input&nbsp;array<br>
+ftype:&nbsp;{'highpass',&nbsp;'lowpass',&nbsp;'bandpass'}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;filter&nbsp;type.&nbsp;Default&nbsp;is&nbsp;'highpass'</tt></dd></dl>
+</td></tr></table>
+</body></html>
