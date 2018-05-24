@@ -20,8 +20,6 @@ class ProcessMap():
     def __call__(self, participant, output=None):
         if not all([m in participant.data for m in self.input_modals]):
             return
-        if output is None:
-            output = participant._hdf._v_file
         data = [participant.data[m] for m in self.input_modals]
         for funcs, outname in zip(self.functions, self.output_names):
             f = funcs[0]
@@ -33,12 +31,12 @@ class ProcessMap():
                          name=outname,
                          obj=d)
 
-    def _output(self, hdf_file, where, name, obj):
+    def _output(self, participant, name, obj):
         if isinstance(obj, types.GeneratorType):
             d = next(obj)
-            tab = ProjectFile.create_radar_table(hdf_file, where, name, obj=d)
+            tab = participant.create_table(name, obj=d)
             for d in obj:
                 tab.append(d)
         else:
-            ProjectFile.create_radar_table(hdf_file, where, name, obj=obj)
+            ptc.create_radar_table(hdf_file, where, name, obj=obj)
 
