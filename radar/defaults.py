@@ -3,7 +3,7 @@ import tables
 from functools import wraps
 
 # Pytables HDF5 default filter
-_FILTER = tables.Filters(complib='blosc:snappy', complevel=1, shuffle=True)
+_FILTER = tables.Filters(complib='blosc:lz4', complevel=2, shuffle=True)
 
 # Schemas dir
 _PACKAGE_DIR = '/' + os.path.join('', *__file__.split(os.path.sep)[:-2])

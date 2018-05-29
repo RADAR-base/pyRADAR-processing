@@ -6,15 +6,15 @@ import glob, os, json
 from ..defaults import _SCHEMA_DIR, _SCHEMA_KEY_FILE, _DEVICE
 
 AVRO_NP_TYPES = {
-    'null': None,
-    'boolean': np.bool_,
-    'int': np.int32,
-    'long': np.int64,
-    'float': np.float32,
-    'double': np.float64,
-    'bytes': np.bytes_,
-    'string': np.object,
-    'enum': np.object,
+    'null': 'object',
+    'boolean': 'bool',
+    'int': 'int32',
+    'long': 'int64',
+    'float': 'float32',
+    'double': 'float64',
+    'bytes': 'bytes',
+    'string': 'object',
+    'enum': 'object',
 }
 
 class ProjectSchemas(dict):

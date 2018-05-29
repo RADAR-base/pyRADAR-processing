@@ -3,12 +3,42 @@ import os
 import glob
 from . import visualise
 from .common import AttrRecDict, progress_bar
+from .io.generic import ProjectIO, ParticipantIO
 from .io.fs import open_project_folder as fs_project
 from .io.hdf5 import open_project_file as h5_project
 from .util.specifications import ProjectSpecs
 from .util.avro import ProjectSchemas
 
-class Project():
+class RadarWrapper():
+    def _get_attr_or_parents(self, attr):
+        if hasattr(self, attr):
+            if getattr(self, attr) is not None:
+                return getattr(self, attr)
+        if getattr(self, parent) is None:
+            return None
+        else:
+            return self.parent._get_attr_or_parents(attr)
+
+    def _get_path(self):
+        """ Returns a path to the participant relative to the project root,
+        based on subproject names
+
+        Output
+        ______
+        path: str
+            A string of the relative path.
+        """
+        parent = self.parent
+        if parent is None:
+            return '/'
+        path = '/' + self.name
+        while parent.parent is not None:
+            path = '/' + parent.name + path
+            parent = parent.parent
+        return path
+
+
+class Project(RadarWrapper):
     """
     """
     def __init__(self, proj_data=None, **kwargs):
@@ -48,6 +78,15 @@ class Project():
     def to_csvs(self, folder_path, *args, **kwargs):
         raise NotImplementedError
 
+    def save_project(self, output=None, *args, **kwargs):
+        if output is None:
+            output = self._get_attr_or_parents('output')
+        for sp in self.subprojects:
+            output.create_subproject(name=sp.name, where=self._get_path())
+            sp.save_project(output=output, *args, **kwargs)
+        for ptc in self.participants:
+            ptc.save_all(output=output)
+
     def _get_subprojects(self, subproject_data_dict):
         for sp_name, sp_data in subproject_data_dict.items():
             self.add_subproject(sp_name, data=sp_data)
@@ -61,7 +100,8 @@ class Project():
 
     def add_participant(self, name, where='.', data=None, info=None):
         proj = self if where == '.' else self.subprojects[where]
-        proj.participants[name] = Participant(data=data, name=name, info=info)
+        proj.participants[name] = Participant(data=data, name=name, info=info,
+                                              parent=self)
         return proj.participants[name]
 
     def add_subproject(self, name, where='.', data=None):
@@ -72,7 +112,7 @@ class Project():
 
     def __str__(self):
         return 'RADAR {}: {}, {} participants'.format(
-            'Project' if hasattr(self, '_hdf_file') else 'Subproject',
+            'Subproject' if getattr(self, 'parent') is None else 'Project',
             self.name,
             len(self.participants))
 
@@ -95,7 +135,7 @@ class Project():
         return map(ptc_func, list(self.participants))
 
 
-class Participant():
+class Participant(RadarWrapper):
     """ A class to hold data and methods concerning participants/subjects in a
     RADAR trial. Typically intialised by opening a Project.
     """
@@ -104,20 +144,48 @@ class Participant():
         self.info = info if info is not None else {}
         self.name = kwargs['name'] if 'name' in kwargs else data.name
         self.parent = kwargs['parent'] if 'parent' in kwargs else None
+        self.labels = kwargs['labels'] if 'labels' in kwargs else None
 
     def __repr__(self):
         return "Participant {}. of type {}".format(self.name, type(self))
 
-    def plot_time_span(self, source, timespan, ycols,
-                       xcol='value.time', fig=None, events=None):
-        print('To be deprecated')
-        df = self.df_from_data(source, ycols.append(xcol))
-        df.set_index(xcol)
-        fig = visualise.interactive.time_span(
-            df, ycols, timespan, fig=fig)
-        if events != None:
-            visualise.interactive.add_events(fig, events)
-        return fig
+
+    def save_all(self, modalities=None, output=None, *args, **kwargs):
+        """ Saves all of the participants data to output.
+        Parameters
+        __________
+        modalities: list
+            A list of the modalities to save. If None, all will be saved.
+        output:
+            A radar data handle. If None, uses the default output for the
+            participant (or parent, etc)
+        """
+        print("Saving {}...".format(self.name))
+        if modalities is None:
+            modalities = list(self.data)
+        for mod in modalities:
+            print('...{}...'.format(mod))
+            self.save_data(data=self.data[mod], name=mod, output=output,
+                           *args, **kwargs)
+
+    def save_data(self, data, name, output=None, *args, **kwargs):
+        """ Saves a data object to an output.
+        Parameters
+        __________
+        data: DataFrame / RecArray / RadarTable
+            Data object to save
+        name: str
+            Name under which to save the output
+        output:
+            A radar data handle. If no output is specified, uses
+            the default output for itself/its parent.
+        """
+        if output is None:
+            output = self._get_attr_or_parents('output')
+        if not isinstance(output, ParticipantIO):
+            output = output.create_participant(where=self.parent._get_path(),
+                                               name=self.name)
+        output.create_table(name=name, obj=data, *args, **kwargs)
 
 
 def from_h5(h5_path, name=None, *args, **kwargs):

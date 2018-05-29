@@ -160,11 +160,11 @@ class ParticipantFolder(ParticipantIO):
                               data_funcs=self._data_funcs,
                               whitelist=kwargs.get('whitelist'))
 
-    def _load_csv(self, where, name):
-        return CsvTable(where, name)
+    def _load_csv(self, where, name, *args, **kwargs):
+        return CsvTable(where, name, *args, **kwargs)
 
-    def _load_csvgz(self, where, name):
-        return CsvTable(where, name, compression='gzip')
+    def _load_csvgz(self, where, name, *args, **kwargs):
+        return CsvTable(where, name, compression='gzip', *args, **kwargs)
 
     def _load_imec(self, where, name):
         return 0

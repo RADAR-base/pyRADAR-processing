@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from ..common import obj_col_names, progress_bar, AttrRecDict
 from ..defaults import _FILTER
-from .generic import ParticipantData
+from .generic import ProjectIO, ParticipantIO, ParticipantData, RadarTable
 
 SPEC_HDF_TYPE = {
     'TIMESTAMP': tables.Int64Col(),
@@ -14,9 +14,14 @@ SPEC_HDF_TYPE = {
 
 NP_HDF_CONVERTERS = {
     '<M8[ns]': lambda x=None: 'int64',
-    '|O': lambda x: 'S' + str(max(map(len, x))),
+    '|O': lambda x: 'S' + str(max(map(len, str(x)))),
 }
 
+# Radar metadata names. Radar type can be project, participant, or data
+RADAR_TYPE = 'RADAR_TYPE'
+PROJECT = 'PROJECT'
+PARTICIPANT = 'PARTICIPANT'
+DATA = 'DATA'
 
 class ProjectFile(tables.File):
     """ HDF5 file for a RADAR project. Subclass of tables.File TODO
@@ -34,6 +39,44 @@ class ProjectFile(tables.File):
                                           filters=filters, **kwargs)
         self.data = ProjectGroup(self.root)
 
+    def create_project(self, where, name, title="", filters=_FILTER, **kwargs):
+        """ Creates a RADAR project group (Can be a subproject).
+        Parameters
+        __________
+        where: str
+            The location to create the project relative to the overall project
+            root directory
+        name: str
+            The name of the project
+        title: str (optional)
+            A title for the HDF5 group
+        filters: pytables filter object (optional)
+            The filters to apply to data stored within this group.
+
+        Output
+        ______
+        sp: ProjectGroup
+            A ProjectGroup object of the newly created project.
+        """
+        if where + '/' + name in self.root:
+            sp = self.get_node(where + '/' + name)
+        else:
+            sp = self.create_group(where, name, title=title, filters=filters)
+            setattr(sp._v_attrs, 'NAME', name)
+            setattr(sp._v_attrs, RADAR_TYPE, PROJECT)
+        sp = ProjectGroup(sp, **kwargs)
+        return sp
+
+    def create_participant(self, where, name, title="", filters=_FILTER):
+        if where + '/' + name in self.root:
+            ptc = self.get_node(where + '/' + name)
+        else:
+            ptc = self.create_group(where, name, title=title, filters=filters)
+            setattr(ptc._v_attrs, 'NAME', name)
+            setattr(ptc._v_attrs, RADAR_TYPE, PARTICIPANT)
+        ptc.__class__ = ParticipantGroup
+        return ptc
+
     def create_radar_data_group(self, where, name, description=None, title='',
                                 filters=_FILTER, createparents=True, obj=None,
                                 **kwargs):
@@ -47,7 +90,7 @@ class ProjectFile(tables.File):
         parentnode = self._get_or_create_path(where, createparents)
         tables.file._checkfilters(filters)
         new = name not in parentnode
-        ptobj = RadarDataGroup(parentnode, name, title=title,
+        ptobj = H5DataGroup(parentnode, name, title=title,
                                filters=filters, new=new, **kwargs)
         if obj:
             ptobj.append_dataframe(obj)
@@ -69,7 +112,7 @@ class ProjectFile(tables.File):
             if isinstance(obj, np.ndarray):
                 pass
             elif isinstance(obj, pd.DataFrame):
-                obj = self
+                obj = _df_to_usable(obj)
             else:
                 raise TypeError('Invalid obj type %r' %obj)
             descr, _ = tables.description.descr_from_dtype(obj.dtype)
@@ -83,7 +126,7 @@ class ProjectFile(tables.File):
             raise ValueError('No description provided')
         tables.file._checkfilters(filters)
 
-        ptobj = RadarTable(parentnode, name, description=description,
+        ptobj = H5Table(parentnode, name, description=description,
                            title=title, filters=filters,
                            expectedrows=expectedrows, chunkshape=chunkshape,
                            byteorder=byteorder)
@@ -99,16 +142,17 @@ class ProjectFile(tables.File):
         self.create_radar_table(where, name, description=description,
                                 createparents=createparents, **kwargs)
 
-    def save_dataframe(self, df, where, name, source_type='DATA', **kwargs):
+    def save_dataframe(self, df, where, name, source_type=DATA, **kwargs):
         """Add a pandas dataframe to an entrypoint in the hdf5 file
         """
         table = self.create_radar_table(where, name, obj=df, overwrite=True,
                                         **kwargs)
         setattr(table._v_attrs, 'NAME', name)
-        setattr(table._v_attrs, 'RADAR_TYPE', source_type)
+        setattr(table._v_attrs, RADAR_TYPE, source_type)
         return table
 
-class ProjectGroup():
+
+class ProjectGroup(ProjectIO):
     """
     """
     def __init__(self, hdf, **kwargs):
@@ -136,11 +180,12 @@ class ProjectGroup():
         for name, child in self._hdf._v_children.items():
             if isinstance(child, tables.link.Link):
                 child = child()
-            if not hasattr(child._v_attrs, 'RADAR_TYPE'):
+            if not hasattr(child._v_attrs, RADAR_TYPE):
                 continue
-            if child._v_attrs.RADAR_TYPE == 'SUBPROJECT':
+            if child._v_attrs.RADAR_TYPE == PROJECT:
                 self.participants[name] = AttrRecDict()
-                sp[name] = ProjectGroup(child, participants=self.participants[name],
+                sp[name] = ProjectGroup(child,
+                                        participants=self.participants[name],
                                         name=name, parent=self)
         return sp
 
@@ -149,21 +194,33 @@ class ProjectGroup():
         for name, child in self._hdf._v_children.items():
             if isinstance(child, tables.link.Link):
                 child = child()
-            if not hasattr(child._v_attrs, 'RADAR_TYPE'):
+            if not hasattr(child._v_attrs, RADAR_TYPE):
                 continue
-            if child._v_attrs.RADAR_TYPE == 'PARTICIPANT':
+            if child._v_attrs.RADAR_TYPE == PARTICIPANT:
                 child.__class__ = ParticipantGroup
                 ptcs[name] = child
         return ptcs
 
-    def create_subproject(self, where, name):
-        pass
+    def create_subproject(self, name, where=None):
+        if where is None:
+            where = self._hdf._v_pathname
+        self.participants[name] = AttrRecDict()
+        sp = self._hdf._v_file.\
+                create_project(name=name, where=where,
+                               participants=self.participants[name])
+        self.subprojects[name] = sp
+        return self.subprojects[name]
 
-    def create_participant(self, where, name):
-        pass
+    def create_participant(self, name, where=None):
+        if where is None:
+            where = self._hdf._v_pathname
+        ptc = self._hdf._v_file.\
+                create_participant(name=name, where=where)
+        self.participants[name] = ptc
+        return self.participants[name]
 
 
-class ParticipantGroup(tables.Group):
+class ParticipantGroup(tables.Group, ParticipantIO):
     """ A Pytables group object for use with RADAR participant data.
     Exactly the same as a pytables Group, but has the method 'get_data_dict' to
     get a dictionary of participant data groups/tables.
@@ -178,42 +235,67 @@ class ParticipantGroup(tables.Group):
             if isinstance(node, tables.link.Link):
                 node = node()
             if isinstance(node, tables.group.Group):
-                node.__class__ = RadarDataGroup
+                node.__class__ = H5DataGroup
             elif isinstance(node, tables.table.Table):
-                node.__class__ = RadarTable
+                node.__class__ = H5Table
             data_dict[node._v_name] = node
         return data_dict
 
+    def create_table(self, name, where=None, obj=None, descr=None, *args, **kwargs):
+        if where is None:
+            where = self._v_pathname
+        else:
+            where = '/'.join([self._v_pathname, where])
+        if (obj is None) and (descr is None):
+            raise ValueError('One or both of obj and descr must be given')
+        if isinstance(obj, RadarTable):
+            obj = obj[:]
+        tab = self._v_file.create_radar_table(name=name, where=where, obj=obj,
+                description=descr, *args, **kwargs)
+        return tab
 
-class RadarTable(tables.Table):
+    def append_table(self, name, obj, where=None, *args, **kwargs):
+
+        return 0
+
+    def delete_table(self, name, where=None):
+
+        return 0
+
+
+class H5Table(tables.Table, RadarTable):
     """ A Pytables table object for use with RADAR participant data.
     """
+    def __init__(self, *args, **kwargs):
+        super(H5Table, self).__init__(*args, **kwargs)
+        setattr(self._v_attrs, RADAR_TYPE, DATA)
+
     def append_dataframe(self, df, *args, **kwargs):
         df = _df_to_usable(df)
         self.append(df, *args, **kwargs)
 
     def __getitem__(self, key):
-        df = super(RadarTable, self).__getitem__(key)
+        df = super(H5Table, self).__getitem__(key)
         df = pd.DataFrame.from_records(df)
         return df
 
 
-class RadarDataGroup(tables.Group):
+class H5DataGroup(tables.Group):
     """ A Group object for storing RADAR data.
     Each column (i.e. array) is unrelated. It is recommended that columns are
     written to be the same length and rows correspond to the same timepoint.
-    The advantage of a RadarDataGroup over a standard RadarTable is that it is
+    The advantage of a H5DataGroup over a standard H5Table is that it is
     easier to add and remove columns and to write data in an asynchronous
     manner.
 
     See also
     ________
     tables.Group : For more information on the PyTables Group object
-    radar.io.hdf5.RadarTable : A table based storage object
+    radar.io.hdf5.H5Table : A table based storage object
     """
     def __init__(self, parentnode, name, filters=_FILTER,
                  obj=None, overwrite=False, **kwargs):
-        super(RadarDataGroup, self).__init__(parentnode, name,
+        super(H5DataGroup, self).__init__(parentnode, name,
                                              filters=_FILTER, **kwargs)
         if obj is not None:
             self.insert_dataframe(obj, overwrite=overwrite)
@@ -272,12 +354,12 @@ class RadarDataGroup(tables.Group):
             May be a column name, list of column names, a slice, or a
             combination of a slice and column name(s).
             e.g.
-            RadarDataGroup[0:100] for index 0 to 100 of all columns.
-            RadarDataGroup['c1'] for the entirety of column c1.
-            RadarDataGroup[['c1', 'c2']] for the entireties of columns 'c1' and
+            H5DataGroup[0:100] for index 0 to 100 of all columns.
+            H5DataGroup['c1'] for the entirety of column c1.
+            H5DataGroup[['c1', 'c2']] for the entireties of columns 'c1' and
                 'c2'
-            RadarDataGroup['c1', 5:25] for index 5 to 25 of column 'c1'
-            RadarDataGroup[['c1', 'c3'], -25:] for the final 25 values of columns
+            H5DataGroup['c1', 5:25] for index 5 to 25 of column 'c1'
+            H5DataGroup[['c1', 'c3'], -25:] for the final 25 values of columns
                 'c1' and 'c3'.
 
         Returns
@@ -300,9 +382,9 @@ class RadarDataGroup(tables.Group):
         item: slice, list
             Must be a slice or a slice and column name(s)
             e.g.
-            RadarDataGroup[0:100] = df
-            RadarDataGroup[0:100, 'c1'] = df
-            RadarDataGroup[0:100, ['c1', 'c2', 'c3']] = df
+            H5DataGroup[0:100] = df
+            H5DataGroup[0:100, 'c1'] = df
+            H5DataGroup[0:100, ['c1', 'c2', 'c3']] = df
         df: pandas.DataFrame
             A dataframe with the same columns as the table/given as the item.
             Alternatively, if only one column is selected, may be a numpy array
@@ -391,3 +473,17 @@ def open_project_file(filename, mode='r', title='', root_uep='/',
                     'The file "{}" is already opened. Can\'t ',
                     'reopen in write mode', filename)
     return ProjectFile(filename, mode, title, root_uep, filters, **kwargs)
+
+def _df_to_usable(df, converters=NP_HDF_CONVERTERS):
+    if type(df.index) is not pd.RangeIndex:
+        rec = df.to_records()
+    else:
+        rec = df.to_records(index=False)
+
+    dtypes = []
+    for name, dt in rec.dtype.descr:
+        dtypes.append(converters[dt](rec[name])) if dt in converters \
+                else dtypes.append(dt)
+
+    return np.rec.fromrecords(rec, formats=dtypes, names=rec.dtype.names)
+

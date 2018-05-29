@@ -165,6 +165,4 @@ def progress_bar(progress, total, prefix='Progress: ', suffix='', length=50):
         print('')
 
 def date_parser(timestamp):
-    return pd.Timestamp(float(timestamp))
-
-
+    return pd.to_datetime(timestamp, unit='s')

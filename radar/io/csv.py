@@ -10,14 +10,17 @@ from .generic import RadarTable
 
 
 class CsvTable(RadarTable):
-    def _make_dask_df(self, where, name, compression=None):
+    def _make_dask_df(self, where, name, compression=None, dtype=None):
         folder = os.path.join(where, name)
         if compression is None:
-            return dd.read_csv(os.path.join(folder, '*.csv'))
+            return dd.read_csv(os.path.join(folder, '*.csv'),
+                                            dtype=dtype)
         else:
             return dd.read_csv(os.path.join(folder, '*.csv.*'),
                                compression=compression,
-                               blocksize=None)
+                               blocksize=None,
+                               na_filter=False,
+                               dtype=dtype)
 
 class CsvDataGroup():
     pass
