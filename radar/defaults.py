@@ -49,13 +49,3 @@ def debug_wrapper(function):
                                                         function.__module__))
         return result
     return wrapper
-
-class argu_decorator(object):
-    def __init__(self, *oargs, **okwargs):
-        self.oargs = oargs
-        self.okwargs = okwargs
-
-    def __call__(self, func, *args, **kwargs):
-        def argu_func(*args, **kwargs):
-            return func(*args, *self.oargs, **kwargs, **self.okwargs)
-        return argu_func

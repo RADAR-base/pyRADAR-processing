@@ -159,14 +159,20 @@ class ParticipantFolder(ParticipantIO):
                               data_funcs=self._data_funcs,
                               whitelist=kwargs.get('whitelist'))
 
+    def _load_table(self, table, where, name, *args, **kwargs):
+        return table(where, name, specification=specification,
+                     schema=schema, *args, **kwargs)
+
     def _load_csv(self, where, name, *args, **kwargs):
-        return CsvTable(where, name, *args, **kwargs)
+        return _load_table(CsvTable, where, name, *args, **kwargs)
 
     def _load_csvgz(self, where, name, *args, **kwargs):
-        return CsvTable(where, name, compression='gzip', *args, **kwargs)
+        return _load_table(CsvTable, where, name, compression='gzip',
+                           *args, **kwargs)
 
-    def _load_imec(self, where, name):
-        return 0
+    def _load_imec(self, where, name, *args, **kwargs):
+        return -1#_load_table(ImecTable, where, name, *args, **kwargs)
+
 
 
 def listdir_conditional(path, conditional):
