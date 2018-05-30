@@ -112,7 +112,6 @@ class ParticipantFolder(ParticipantIO):
                     continue
                 for modal in listfolders(os.path.join(path, sd)):
                     folders.append(os.path.join(sd, modal))
-
             return [f for f in folders if f not in subdirs]
 
         def get_modalities(where, names, filetypes, data_funcs, whitelist=None):
