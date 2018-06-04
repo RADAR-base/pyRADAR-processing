@@ -63,7 +63,8 @@ class Imec(object):
 
     def plot_timespan(self, modality, start_time, stop_time, sample_rate=None):
         df = self.get_df_time(modality, start_time, stop_time, sample_rate)
-        fig = plt.plot(df)
+        fig = plt.figure()
+        plt.plot(df)
         plt.legend(df.columns)
         return fig
 
