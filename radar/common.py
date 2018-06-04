@@ -1,12 +1,22 @@
 import numpy as np
 import logging
+from .defaults import FILE_LOGGING
+from datetime import datetime
 
 logger = logging.getLogger('radarlog')
-ch = logging.StreamHandler()
-ch.setLevel(logging.ERROR)
-ch.setFormatter(logging.Formatter(('%(asctime)s - %(name)s - ',
-                                   '%(levelname)s - %(message)s')))
-logger.addHandler(ch)
+logformat = logging.Formatter('%(asctime)s - %(name)s' + \
+                              ' - %(levelname)s - %(message)s')
+clilog = logging.StreamHandler()
+clilog.setLevel(logging.ERROR)
+clilog.setFormatter(logformat)
+logger.addHandler(clilog)
+
+if FILE_LOGGING:
+    filelog = logging.FileHandler('radar_{:%Y%m%d-%H%M}.log'.format(
+                                                                datetime.now()))
+    filelog.setLevel(logging.WARNING)
+    filelog.setFormatter(logformat)
+    logger.addHandler(filelog)
 
 class RecursiveDict(dict):
     """ A dictionary that can directly access items from nested dictionaries
