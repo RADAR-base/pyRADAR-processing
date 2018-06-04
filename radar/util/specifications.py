@@ -92,6 +92,9 @@ class ModalitySpec(OrderedDict):
     def timedelta_columns(self):
         return self._type_columns('DURATION')
 
+    def dtype(self):
+        raise NotImplementedError
+
 
 class FieldSpec(OrderedDict):
     """

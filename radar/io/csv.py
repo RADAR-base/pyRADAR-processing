@@ -10,7 +10,8 @@ from .generic import RadarTable
 
 
 class CsvTable(RadarTable):
-    def _make_dask_df(self, where, name, compression=None, dtype=None):
+    def _make_dask_df(self, where, name, compression=None,
+                      dtype=None, **kwargs):
         folder = os.path.join(where, name)
         if compression is None:
             return dd.read_csv(os.path.join(folder, '*.csv'),

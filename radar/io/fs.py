@@ -73,17 +73,26 @@ class ParticipantFolder(ParticipantIO):
             'imec': self._load_imec,
             }
         self.path = folder_path
+
         self.name = kwargs.get('name')
         if self.name is None:
-            self.name = os.path.split[folder_path][1]
+            self.name = os.path.split(folder_path)[-1]
+
         self._filetypes = kwargs.get('filetypes')
         if self._filetypes is None:
             self._filetypes = list(self._data_funcs)
+
         self._subdirs = kwargs.get('subdirs')
         if self._subdirs is None:
             self._subdirs = []
-        self.data = self.get_data_dict()
-        self.info = {}
+
+        self._specs = kwargs.get('specifications')
+        if self._specs is None:
+            self._specs = {}
+
+        self._schemas = kwargs.get('schemas')
+        if self._schemas is None:
+            self._schemas = {}
 
     def get_data_dict(self, filetypes=None, subdirs=None, **kwargs):
         """ Returns a dictionary of data modality objects within the participant
@@ -120,8 +129,9 @@ class ParticipantFolder(ParticipantIO):
                 if whitelist is not None:
                     if name not in whitelist:
                         continue
-                key = os.path.basename(name)
-                modalities[key] = data_loader(where, name, data_funcs)
+                path = os.path.join(where, name)
+                fullwhere, basename = os.path.split(path)
+                modalities[basename] = data_loader(fullwhere, basename, data_funcs)
             return modalities
 
         def data_loader(where, name, data_funcs):
@@ -152,6 +162,11 @@ class ParticipantFolder(ParticipantIO):
             filetypes = self._filetypes
         if subdirs is None:
             subdirs = self._subdirs
+        if 'specifications' in kwargs:
+            self._specs = kwargs['specifications']
+        if 'schemas' in kwargs:
+            self._schemas = kwargs['schemas']
+
 
         return get_modalities(where=self.path,
                               names=get_folders(self.path, subdirs),
@@ -160,18 +175,20 @@ class ParticipantFolder(ParticipantIO):
                               whitelist=kwargs.get('whitelist'))
 
     def _load_table(self, table, where, name, *args, **kwargs):
+        specification = self._specs[name] if name in self._specs else None
+        schema = self._schemas[name] if name in self._schemas else None
         return table(where, name, specification=specification,
                      schema=schema, *args, **kwargs)
 
     def _load_csv(self, where, name, *args, **kwargs):
-        return _load_table(CsvTable, where, name, *args, **kwargs)
+        return self._load_table(CsvTable, where, name, *args, **kwargs)
 
     def _load_csvgz(self, where, name, *args, **kwargs):
-        return _load_table(CsvTable, where, name, compression='gzip',
+        return self._load_table(CsvTable, where, name, compression='gzip',
                            *args, **kwargs)
 
     def _load_imec(self, where, name, *args, **kwargs):
-        return -1#_load_table(ImecTable, where, name, *args, **kwargs)
+        return -1#self._load_table(ImecTable, where, name, *args, **kwargs)
 
 
 

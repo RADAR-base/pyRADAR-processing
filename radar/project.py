@@ -9,6 +9,9 @@ from .io.hdf5 import open_project_file as h5_project
 from .util.specifications import ProjectSpecs
 from .util.avro import ProjectSchemas
 
+default_schemas = ProjectSchemas()
+default_specs = ProjectSpecs()
+
 class RadarWrapper():
     def _get_attr_or_parents(self, attr):
         if hasattr(self, attr):
@@ -48,6 +51,10 @@ class Project(RadarWrapper):
         self.subprojects = AttrRecDict()
         self.participants = self.parent.participants[self.name] if self.parent\
                         else AttrRecDict()
+        self.schemas = kwargs['schemas'] if 'schemas' in kwargs\
+                                         else default_schemas
+        self.specifications = kwargs['specifications'] if 'specifications'\
+                                          in kwargs else default_schemas
         if self._data:
             self._get_subprojects(self._data[0].subprojects)
             self._get_participants(self._data[0].participants)
@@ -95,7 +102,9 @@ class Project(RadarWrapper):
         for ptc_name, ptc_data in participant_data_dict.items():
             if not isinstance(ptc_data, AttrRecDict):
                 if not isinstance(ptc_data, dict):
-                    ptc_data = ptc_data.get_data_dict()
+                    ptc_data = \
+                        ptc_data.get_data_dict(specifications=default_specs,
+                                               schemas=default_schemas)
                 self.add_participant(ptc_name, data=ptc_data)
 
     def add_participant(self, name, where='.', data=None, info=None):

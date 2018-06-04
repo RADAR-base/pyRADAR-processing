@@ -164,5 +164,5 @@ def progress_bar(progress, total, prefix='Progress: ', suffix='', length=50):
     if progress >= total:
         print('')
 
-def date_parser(timestamp):
-    return pd.to_datetime(timestamp, unit='s')
+def to_datetime(timestamp):
+    return (10**9 * timestamp).astype('datetime64[ns]')

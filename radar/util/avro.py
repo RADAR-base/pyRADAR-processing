@@ -146,6 +146,10 @@ class RadarSchema():
                 return AVRO_NP_TYPES[data_type]
         return [convert_type(x) for x in self.get_col_types()]
 
+    def dtype(self):
+        return {k:v for k,v in zip(self.get_col_names(),
+                                   self.get_col_numpy_types())}
+
 
 def combine_key_value_schemas(key_schema, value_schema):
     """ Combined a RADAR key schema and a RADAR value schema.
