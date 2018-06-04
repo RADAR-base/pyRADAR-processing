@@ -22,7 +22,7 @@ class Imec(object):
                 'Battery': ['Battery'],
                 'ECG': ['ECG'],
                 'EMG': ['EMG'],
-                'GSR': ['GSR-1', 'GSR-2'],
+                'GSR': ['GSR-2', 'GSR-1'],
                 'PIE': ['PIE'],
                 'Temp': ['Temp'],
                 }
