@@ -1,2 +1,4 @@
-# RADAR-scripts
-Python package and scripts for use with data collected by RADAR
+# pyradar
+A python processing and visualisation package for use with offline RADAR project data.
+
+WIP.
