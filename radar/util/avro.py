@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-from avro import schema
-import pandas as pd
 import numpy as np
 import glob, os, json
 from ..defaults import _SCHEMA_DIR, _SCHEMA_KEY_FILE, _DEVICE
+from ..common import logger
 
 AVRO_NP_TYPES = {
     'null': 'object',
@@ -32,13 +31,9 @@ class ProjectSchemas(dict):
             name = ''.join((_DEVICE if split_rel_path[0] == 'passive' else '',
                             split_rel_path[-1]))[:-5]
             with open(schema_path, 'r') as f:
-                try:
-                    obj = RadarSchema(value_json=f.read(), key_json=key_schema)
-                    self[name] = obj
-                except schema.SchemaParseException:
-                    print(name, 'could not be parsed because it has',
-                          'an unresolved nested schema.\n',
-                          'Nested schemas are not currently supported.')
+                value_json = f.read()
+                obj = RadarSchema(value_json=value_json, key_json=key_schema)
+                self[name] = obj
 
 
 class RadarSchema():
@@ -46,15 +41,6 @@ class RadarSchema():
     A class for use with RADAR-base key-value pair schemas. Initialise with a
     json string representation of the schema.
     """
-
-    INDEX = 'value.time'
-    SORT = 'value.time'
-    TIME_COLS = ['value.time', 'value.timeReceived']
-    CSV_EXT = '.csv'
-    usekeys = True
-
-    class _FakeSchema(object):
-        pass
 
     def __init__(self, schema_json=None, key_json=None, value_json=None):
         """
@@ -73,16 +59,11 @@ class RadarSchema():
         be given alongside value_json.
         """
         if schema_json:
-            self.schema = schema.Parse(schema_json)
+            self.schema = json.loads(schema_json)
         elif value_json:
-            if key_json:
-                self.schema = schema.Parse(combine_key_value_schemas(key_json,
-                                                                     value_json))
-            else:
-                self.schema = self._FakeSchema()
-                self.schema.fields = [self._FakeSchema()]
-                self.schema.fields[0].type = schema.Parse(value_json)
-                self.schema.fields[0].name = 'value'
+            if key_json is None:
+                key_json = '{"namespace": "NoKey", "fields": []}'
+            self.schema = combine_key_value_schemas(key_json, value_json)
         else:
             raise ValueError('Please provide json representation of a'
                              'key-value schema or a value schema with or'
@@ -94,8 +75,8 @@ class RadarSchema():
         Values from schema columns and their parent fields can be retrieved by
         a given function.
         """
-        return [func(col, field, *args) for field in self.schema.fields
-                                        for col in field.type.fields]
+        return [func(col, field, *args) for field in self.schema['fields']
+                                        for col in field['type']['fields']]
 
     def get_col_info_by_key(self, *keys):
         """
@@ -112,7 +93,7 @@ class RadarSchema():
         Returns an array of column names for the csv created by the schema
         """
         def get_name(col, parent):
-            return parent.name + '.' + col.name
+            return parent['name'] + '.' + col['name']
         return self.get_col_info(func=get_name)
 
     def get_col_types(self,):
@@ -121,12 +102,12 @@ class RadarSchema():
         created by the schema
         """
         def get_type(col, *args):
-            typeval = col.type.type
-            if typeval == 'union':
-                return [sch.type for sch in col.type.schemas]
+            typeval = col['type']
+            if type(typeval) is str:
+                return typeval
             else:
                 # Should check for enum/other complex types as well
-                return typeval
+                return typeval['type']
         return self.get_col_info(func=get_type)
 
     def get_col_numpy_types(self):
@@ -164,22 +145,19 @@ def combine_key_value_schemas(key_schema, value_schema):
     """
     key_dict = json.loads(key_schema)
     value_dict = json.loads(value_schema)
-    combined_schema = \
-            '{\n' + \
-            '  "type" : "record",\n' + \
-            '  "name" : "' + value_dict['name'] + '",\n' + \
-            '  "namespace" : "' + key_dict['namespace'] + '_' + \
-                value_dict['namespace'] + '",\n' + \
-            '  "doc" : "combined key-value record",\n' + \
-            '  "fields"  : [ {\n' + \
-            '      "name" : "key",\n' + \
-            '      "type" : ' + key_schema + ',\n' + \
-            '      "doc" : "Key of a Kafka SinkRecord"\n' + \
-            '    }, {\n' + \
-            '      "name" : "value",\n' + \
-            '      "type" : ' + value_schema + ',\n' + \
-            '      "doc" : "Value of a Kafka SinkRecord"\n' + \
-            '  } ]\n' + \
-            '}'
-
-    return combined_schema
+    schema_dict = {
+            'type': 'record',
+            'name': value_dict['name'],
+            'namespace' : '{}_{}'.format(key_dict['namespace'],
+                                         value_dict['namespace']),
+            'doc': 'combined key-value record',
+            'fields': [
+                    {'name': 'key',
+                     'type': key_dict,
+                     'doc': 'Key of a Kafka SinkRecord'},
+                    {'name': 'value',
+                     'type': value_dict,
+                     'doc': 'Value of a Kafka SinkRecord'},
+                ],
+            }
+    return schema_dict
