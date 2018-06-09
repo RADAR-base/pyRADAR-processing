@@ -103,8 +103,11 @@ class RadarSchema():
         """
         def get_type(col, *args):
             typeval = col['type']
-            if type(typeval) is str:
+            typeval_type = type(typeval)
+            if typeval_type is str:
                 return typeval
+            elif typeval_type is list:
+                return typeval[1] if typeval[0] is 'null' else typeval[0]
             else:
                 # Should check for enum/other complex types as well
                 return typeval['type']

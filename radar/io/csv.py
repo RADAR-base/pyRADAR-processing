@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+import csv
+import glob, os, sys
+import numpy as np
 import pandas as pd
 import dask.dataframe as dd
-import glob, os, sys
-import csv
 from ..defaults import TIME_COLS
 from ..util.specifications import ModalitySpec
 from ..util.avro import RadarSchema
@@ -15,13 +16,16 @@ class CsvTable(RadarTable):
         folder = os.path.join(where, name)
         if compression is None:
             return dd.read_csv(os.path.join(folder, '*.csv'),
-                                            dtype=dtype)
+                                            dtype=dtype,
+                                            blocksize=100e6)
         else:
-            return dd.read_csv(os.path.join(folder, '*.csv.*'),
-                               compression=compression,
-                               blocksize=None,
-                               na_filter=False,
-                               dtype=dtype)
+            df = dd.read_csv(os.path.join(folder, '*.csv.*'),
+                             compression=compression,
+                             blocksize=None,
+                             na_filter=False,
+                             dtype=dtype)
+            df = df.repartition(npartitions=int(np.ceil(df.npartitions/24)))
+            return df
 
 class CsvDataGroup():
     pass

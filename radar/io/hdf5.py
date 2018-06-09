@@ -229,7 +229,7 @@ class ParticipantGroup(tables.Group, ParticipantIO):
         super(ParticipantGroup, self).__init__(*args, **kwargs)
         self._dict = get_data_dict()
 
-    def get_data_dict(self):
+    def get_data_dict(self, *arg, **kwargs):
         data_dict = ParticipantData()
         for node in self._f_iter_nodes():
             if isinstance(node, tables.link.Link):

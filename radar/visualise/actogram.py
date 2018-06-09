@@ -2,17 +2,16 @@
 import matplotlib.pyplot as plt
 
 def plot(dataframe, datacol='value.x'):
-    z = 1
     groups = dataframe.groupby([dataframe.index.year, dataframe.index.month,
                                 dataframe.index.day])
-    for labels, group in groups:
-        ax = plt.subplot(len(groups), 1, z)
-        group.plot(y=datacol, ax=ax, color='k')
-        plt.xticks(visible=False)
-        plt.yticks(visible=False)
+    n = len(groups)
+    fig, axes = plt.subplots(len(groups), 1, sharey=True, figsize=(8, n*0.15))
+    for i, group in enumerate(groups):
+        group[1].plot(y=datacol, ax=axes[i], color='k', kind='area',
+                      yticks=[], sharex=True)
         plt.subplots_adjust(hspace=0)
-        plt.ylim(0, 1)
-        ax.legend_.remove()
-        z = z + 1
-    plt.show()
-    return plt
+        axes[i].legend_.remove()
+    mticks = axes[n-1].get_xaxis().get_majorticklabels()
+    mticks[1].set_text('00:00')
+    mticks[2].set_text('00:00')
+    return fig
