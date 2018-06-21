@@ -28,6 +28,12 @@ class RecursiveDict(dict):
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
 
+    def __repr__(self):
+        string = 'Recursive dict with\nTop level keys:\n{}\nLeaf keys:\n{}'.\
+                format(', '.join((k for k in self.keys())),
+                       ', '.join((k for k in self._get_keys())))
+        return string
+
     def __getitem__(self, key):
         if key == '/':
             return self
@@ -105,13 +111,11 @@ class AttrRecDict(RecursiveDict):
         return val[0]
 
     def __repr__(self):
-        repr_string = ('Recursive attribute dictionary: {}\n'
-                       'Total items: {}\n'
-                       'Top-level keys: {}\n').format(
-                           self.__class__,
-                           len(self),
-                           ', '.join(list(self.keys())))
-        return repr_string
+        string = super(AttrRecDict, self).__repr__()
+        string = string.split('\n')
+        string[0] = 'Attribute recursive dict with'
+        string = '\n'.join(string)
+        return string
 
 
 def obj_col_names(obj):

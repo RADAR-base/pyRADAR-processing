@@ -2,22 +2,6 @@
 import os
 from ..common import to_datetime
 
-class ProjectIO():
-    pass
-
-
-class ParticipantIO():
-    pass
-
-
-class ParticipantData(dict):
-    def __repr__(self):
-        return 'Participant data tables:\n' + ', '.join(list(self.keys()))
-
-    def available(self):
-        print(self.__repr__())
-
-
 class RadarTable():
     def __init__(self, where, name, **kwargs):
         """ Initialize a generic RadarTable. Used as a parent class for
@@ -45,7 +29,7 @@ class RadarTable():
         self.name = name
         self._schema = kwargs.get('schema')
         self._specification = kwargs.get('specification')
-        self._timecols = kwargs.get('timecols') if 'timecol' in kwargs else []
+        self._timecols = kwargs.geT('timecols') if 'timecol' in kwargs else []
         self._infer_time = kwargs.get('infer_time')
         dtype = kwargs.get('dtype')
         if self._schema is not None:

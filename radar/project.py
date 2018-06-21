@@ -2,12 +2,10 @@
 import os
 import glob
 from . import visualise
+from .io import *
 from .common import AttrRecDict, progress_bar
-from .io.generic import ProjectIO, ParticipantIO
-from .io.fs import open_project_folder as fs_project
-from .io.hdf5 import open_project_file as h5_project
-from .util.specifications import ProjectSpecs
 from .util.avro import ProjectSchemas
+from .util.specifications import ProjectSpecs
 
 default_schemas = ProjectSchemas()
 default_specs = ProjectSpecs()
@@ -67,25 +65,8 @@ class Project(RadarWrapper):
         else:
             raise KeyError('No such subproject or participant: {}'.format(key))
 
-    def load_h5(self, h5_path, *args, **kwargs):
-        data = h5_project(h5_path, *args, **kwargs).data
-        self._get_subprojects(data.subprojects)
-        self._get_participants(data.participants)
-        self._data.append(data)
-
-    def load_fs(self, folder_path, *args, **kwargs):
-        data = fs_project(folder_path, *args, **kwargs)
-        self._get_subprojects(data.subprojects)
-        self._get_participants(data.participants)
-        self._data.append(data)
-
-    def to_h5(self, h5_path, *args, **kwargs):
-        raise NotImplementedError
-
-    def to_csvs(self, folder_path, *args, **kwargs):
-        raise NotImplementedError
-
     def save_project(self, output=None, *args, **kwargs):
+        """OLD
         if output is None:
             output = self._get_attr_or_parents('output')
         for sp in self.subprojects:
@@ -93,12 +74,18 @@ class Project(RadarWrapper):
             sp.save_project(output=output, *args, **kwargs)
         for ptc in self.participants:
             ptc.save_all(output=output)
+            """
+        pass
 
     def _get_subprojects(self, subproject_data_dict):
+        """OLD
         for sp_name, sp_data in subproject_data_dict.items():
             self.add_subproject(sp_name, data=sp_data)
+        """
+        pass
 
     def _get_participants(self, participant_data_dict):
+        """OLD
         for ptc_name, ptc_data in participant_data_dict.items():
             if not isinstance(ptc_data, AttrRecDict):
                 if not isinstance(ptc_data, dict):
@@ -106,10 +93,12 @@ class Project(RadarWrapper):
                         ptc_data.get_data_dict(specifications=default_specs,
                                                schemas=default_schemas)
                 self.add_participant(ptc_name, data=ptc_data)
+                """
+        pass
 
     def add_participant(self, name, where='.', data=None, info=None):
         proj = self if where == '.' else self.subprojects[where]
-        proj.participants[name] = Participant(data=data, name=name, info=info,
+        proj.participants[name] = Participant(folder=folder, name=name, info=info,
                                               parent=self)
         return proj.participants[name]
 
@@ -148,61 +137,57 @@ class Participant(RadarWrapper):
     """ A class to hold data and methods concerning participants/subjects in a
     RADAR trial. Typically intialised by opening a Project.
     """
-    def __init__(self, data=None, info=None, **kwargs):
-        self.data = data if data is not None else {}
-        self.info = info if info is not None else {}
-        self.name = kwargs['name'] if 'name' in kwargs else data.name
+    def __init__(self, name=None, path=None, info=None, **kwargs):
+
+        if not (name or folder or 'paths' in kwargs):
+            raise ValueError(('You must specify a name or else provide'
+                              'a path (or paths) to the participant'))
+
+        paths = [path] if path is not None else \
+                 kwargs['path'] if 'path' in kwargs else []
+        self.name = name if name is not None \
+                         else paths[0].split('/')[-1]
         self.parent = kwargs['parent'] if 'parent' in kwargs else None
-        self.labels = kwargs['labels'] if 'labels' in kwargs else None
+        self.info = info if info is not None else {}
+        self.labels = kwargs['labels'] if 'labels' in kwargs else {}
+
+        datakw = datakw if 'datakw' in kwargs else {}
+        self.data = ParticipantData(paths=paths, datakw=datakw)
 
     def __repr__(self):
         return "Participant {}. of type {}".format(self.name, type(self))
 
-
-    def save_all(self, modalities=None, output=None, *args, **kwargs):
-        """ Saves all of the participants data to output.
+    def export_data(self, data=None, names=None, project_path=None,
+                    filetype=None, *args, **kwargs):
+        """ Exports a data object to another file or format.
         Parameters
         __________
-        modalities: list
-            A list of the modalities to save. If None, all will be saved.
-        output:
-            A radar data handle. If None, uses the default output for the
-            participant (or parent, etc)
-        """
-        print("Saving {}...".format(self.name))
-        if modalities is None:
-            modalities = list(self.data)
-        for mod in modalities:
-            print('...{}...'.format(mod))
-            self.save_data(data=self.data[mod], name=mod, output=output,
-                           *args, **kwargs)
-
-    def save_data(self, data, name, output=None, *args, **kwargs):
-        """ Saves a data object to an output.
-        Parameters
-        __________
-        data: DataFrame / RecArray / RadarTable
+        data : DataFrame / RecArray / RadarTable
             Data object to save
-        name: str
+        name : str
             Name under which to save the output
-        output:
-            A radar data handle. If no output is specified, uses
-            the default output for itself/its parent.
+        path : str
+        filetype : str
         """
-        if output is None:
-            output = self._get_attr_or_parents('output')
+        output = self._get_attr_or_parents('output')
+        given = (name, project_path, filetype)
+        generic = (self.name, output['project_path'], output['filetype'])
+        name, project_path, filetype = \
+                   (x if x is not None else (generic)[i]
+                    for i, x in enumerate(given))
+
+        """
         if not isinstance(output, ParticipantIO):
             output = output.create_participant(where=self.parent._get_path(),
                                                name=self.name)
         output.create_table(name=name, obj=data, *args, **kwargs)
+        """
 
 
-def from_h5(h5_path, name=None, *args, **kwargs):
-    proj = Project(name=name if name else h5_path)
-    proj.load_h5(h5_path, *args, **kwargs)
-    return proj
 
-def from_fs(folder_path, name=None, *args, **kwargs):
-    proj = Project(name=name if name else folder_path)
-    proj.load_fs(folder_path, *args, **kwargs)
-    return proj
+class ParticipantData(object):
+
+    def __init__(self, *args, **kwargs):
+        print(args)
+        print(kwargs)
+
