@@ -1,122 +1,14 @@
-import numpy as np
+import os
 import logging
-from .defaults import FILE_LOGGING
+import numpy as np
 from datetime import datetime
 
-logger = logging.getLogger('radarlog')
-logformat = logging.Formatter('%(asctime)s - %(name)s' + \
-                              ' - %(levelname)s - %(message)s')
-clilog = logging.StreamHandler()
-clilog.setLevel(logging.ERROR)
-clilog.setFormatter(logformat)
-logger.addHandler(clilog)
-
-if FILE_LOGGING:
-    filelog = logging.FileHandler('radar_{:%Y%m%d-%H%M}.log'.format(
-                                                                datetime.now()))
-    filelog.setLevel(logging.WARNING)
-    filelog.setFormatter(logformat)
-    logger.addHandler(filelog)
-
-class RecursiveDict(dict):
-    """ A dictionary that can directly access items from nested dictionaries
-    using the '/' character.
-    Example:
-        d = RecursiveDict((('inner', {'innerkey':'innerval'}),))
-        d['inner/innerkey'] returns 'innerval'
-    """
-    def __init__(self, *args, **kwargs):
-        dict.__init__(self, *args, **kwargs)
-
-    def __repr__(self):
-        string = 'Recursive dict with\nTop level keys:\n{}\nLeaf keys:\n{}'.\
-                format(', '.join((k for k in self.keys())),
-                       ', '.join((k for k in self._get_keys())))
-        return string
-
-    def __getitem__(self, key):
-        if key == '/':
-            return self
-        key_split = key.split('/')
-        key = key_split.pop(0)
-        if key == '':
-            return KeyError('')
-        if key_split:
-            return dict.__getitem__(self, key).__getitem__('/'.join(key_split))
-        else:
-            return dict.__getitem__(self, key)
-
-    def __setitem__(self, key, value):
-        key_split = key.split('/')
-        key = key_split.pop(0)
-        if key == '':
-            return KeyError('')
-        if key_split:
-            self[key].__setitem__(self, key, value)
-        else:
-            dict.__setitem__(self, key, value)
-
-    def _get_x(self, xattr):
-        out = []
-        for x, v in zip(getattr(self, xattr)(), self.values()):
-            if isinstance(v, RecursiveDict):
-                out.extend(v._get_x(xattr))
-            elif isinstance(v, dict) & hasattr(v, xattr):
-                out.extend(getattr(v, xattr)())
-            else:
-                out.append(x)
-        return out
-
-    def _get_items(self):
-        return self._get_x('items')
-
-    def _get_values(self):
-        return self._get_x('values')
-
-    def _get_keys(self):
-        return self._get_x('keys')
-
-    def __iter__(self):
-        return iter(self._get_values())
-
-    def __len__(self):
-        return len(self._get_keys())
-
-
-class AttrRecDict(RecursiveDict):
-    """ A dictionary, based on RecursiveDict, that allows recurisve access to
-    nested dictionary items using object attributes.
-    Only the final level / leaf dictionaries will have attribute accessible
-    items. Primarily used to access subproject participants from a higher level
-    project.
-    Example:
-        d = AttrRecDict((('inner', {'innerkey':'innerval'}),))
-        d.inner raises an AttributeError
-        d.innerkey returns 'innerval'
-        d['inner'] returns {'inner': 'innerkey'}
-        d['inner/innerkey'] returns 'innerval
-    """
-    def __getattr__(self, name):
-        if name not in [x for x in self._get_keys()]:
-            raise AttributeError(
-                "No such attribute '{}' in '{}'".format(name, self))
-        kv = self._get_items()
-        val = [x[1] for x in kv if x[0] == name] or None
-        if val is None:
-            raise AttributeError(
-                "No such attribute '{}' in '{}'".format(name, self))
-        elif len(val) > 1:
-            raise ValueError(
-                'Multiple participants with the same ID: {}'.format(name))
-        return val[0]
-
-    def __repr__(self):
-        string = super(AttrRecDict, self).__repr__()
-        string = string.split('\n')
-        string[0] = 'Attribute recursive dict with'
-        string = '\n'.join(string)
-        return string
-
+def abs_path(path):
+    if not (os.path.isabs(path) or len(path.split('://')) > 1):
+        path = os.path.abspath(path)
+    elif path[-1] is '/':
+        path = path[:-1]
+    return path
 
 def obj_col_names(obj):
     """ Returns a list of column names from a numpy record array or pandas
@@ -127,64 +19,24 @@ def obj_col_names(obj):
     else:
         return list(obj.columns)
 
-def iter_repeater(x):
-    """ Returns a function that will yield an object a given number of times
-    Parameters
-    _________
-    x: object
-        The object to be yielded
-    Returns
-    _______
-    repeat: function
-        A function that yields 'x' a given number of times (set by the
-        function's parameter 'times').
-    """
-    def repeat(times):
-        """ Yields a set object a number of times
-        Parameters
-        _________
-        times: int
-            The number of times to yield the object
-        Yields
-        ______
-        x: object
-            An object defined at the functions creation time.
-        See Also
-        ________
-        radar.common.iter_repeater
-        """
-        i = 0
-        while i < times:
-            i += 1
-            yield x
-    return repeat
+def add_cli_log(log, formatter, level=logging.ERROR):
+    clilog = logging.StreamHandler()
+    clilog.setLevel(level)
+    clilog.setFormatter(formatter)
+    log.addHandler(clilog)
+    return log
 
-def progress_bar(progress, total, prefix='Progress: ', suffix='', length=50):
-    """ Prints a progress bar on the terminal line, which can be
-    updated/overwritten with subsequent calls
-    Parameters
-    _________
-    progress: int or float
-        A number corresponding to the current progress
-    total: int or float
-        The number at which the task will be 100% complete.
-        I.e. 100 * progress / total should give the percentage complete.
-    prefix: str (optional)
-        A string to print preceeding the bar
-    suffix: str (optional)
-        A string to print after the bar
-    length: int (optional)
-        The character length of the bar
-    """
-    completed = int((progress/total)*length)
-    bar = "{pre} |{comp}{empty}| {suff}".format(
-        pre=prefix,
-        comp='█' * completed,
-        empty='-' * (length - completed),
-        suff=suffix)
-    print(bar, end='\r')
-    if progress >= total:
-        print('')
+def add_file_log(log, formatter, level=logging.WARNING):
+    filename = 'radar_{:%Y%m%d-%H%M}.log'.format(datetime.now()) 
+    filelog = logging.FileHandler(filename)
+    filelog.setLevel(level)
+    filelog.setFormatter(formatter)
+    log.addHandler(filelog)
+    return log
 
-def to_datetime(timestamp):
-    return (10**9 * timestamp).astype('datetime64[ns]')
+log = logging.getLogger('radarlog')
+formatter = logging.Formatter('%(asctime)s - %(name)s' + \
+                              ' - %(levelname)s - %(message)s')
+log = add_cli_log(log, formatter)
+if config['log_to_file']:
+    log = add_file_log(log, formatter)

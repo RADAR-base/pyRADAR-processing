@@ -1,27 +1,22 @@
 #!/usr/bin/env python3
-import os
-import glob
-from . import visualise
 from .io import *
-from .common import AttrRecDict, progress_bar
-from .util.avro import ProjectSchemas
-from .util.specifications import ProjectSpecs
+from .common import abs_path
+from .generic import AttrRecDict
 
-default_schemas = ProjectSchemas()
-default_specs = ProjectSpecs()
 
-class RadarWrapper():
+class RadarObject():
     def _get_attr_or_parents(self, attr):
-        if hasattr(self, attr):
-            if getattr(self, attr) is not None:
-                return getattr(self, attr)
-        if getattr(self, parent) is None:
-            return None
+        if hasattr(self, attr) and getattr(self, attr) is not None:
+            res = getattr(self, attr)
+        elif getattr(self, parent) is None:
+            res = None
         else:
-            return self.parent._get_attr_or_parents(attr)
+            res =  self._parent._get_attr_or_parents(attr)
+
+        return res
 
     def _get_path(self):
-        """ Returns a path to the participant relative to the project root,
+        """ Returns a path to the RadarObject relative to the project root,
         based on subproject names
 
         Output
@@ -29,33 +24,47 @@ class RadarWrapper():
         path: str
             A string of the relative path.
         """
-        parent = self.parent
+        parent = self._parent
         if parent is None:
             return '/'
         path = '/' + self.name
-        while parent.parent is not None:
+        while parent._parent is not None:
             path = '/' + parent.name + path
-            parent = parent.parent
+            parent = parent._parent
         return path
 
+    def _norm_paths(self, paths):
+        paths = [paths] if isinstance(paths, str) else \
+                paths if isinstance(paths ,list) else []
+        return [abs_path(p) for p in paths]
 
-class Project(RadarWrapper):
+    def _p_schemas(self):
+        return self._get_attr_or_parents('schemas')
+
+    def _p_specifications(self):
+        return self._get_attr_or_parents('specifications')
+
+    def _p_armt_definitions(self):
+        return self._get_attr_or_parents('armt_definitions')
+
+    def _p_armt_protocols(self):
+        return self._get_attr_or_parents('armt_protocols')
+
+
+class Project(RadarObject):
     """
     """
-    def __init__(self, proj_data=None, **kwargs):
-        self.name = kwargs['name'] if 'name' in kwargs else proj_data.name
-        self.parent = kwargs['parent'] if 'parent' in kwargs else None
-        self._data = [proj_data] if proj_data is not None else []
+    def __init__(self, paths=None, **kwargs):
+        self.name = kwargs['name'] if 'name' in kwargs else ''
+        self._paths = self._norm_paths(paths)
+        self._parent = kwargs['parent'] if 'parent' in kwargs else None
         self.subprojects = AttrRecDict()
-        self.participants = self.parent.participants[self.name] if self.parent\
-                        else AttrRecDict()
-        self.schemas = kwargs['schemas'] if 'schemas' in kwargs\
-                                         else default_schemas
+        self.participants = self._parent.participants[self.name] if self.parent\
+                            else AttrRecDict()
+        self.schemas = kwargs['schemas'] if 'schemas' in kwargs else \
+                       default_schemas
         self.specifications = kwargs['specifications'] if 'specifications'\
-                                          in kwargs else default_schemas
-        if self._data:
-            self._get_subprojects(self._data[0].subprojects)
-            self._get_participants(self._data[0].participants)
+                              in kwargs else default_schemas
 
     def __getitem__(self, key):
         if key in self.subprojects:
@@ -98,11 +107,11 @@ class Project(RadarWrapper):
 
     def add_participant(self, name, where='.', data=None, info=None):
         proj = self if where == '.' else self.subprojects[where]
-        proj.participants[name] = Participant(folder=folder, name=name, info=info,
-                                              parent=self)
+        proj.participants[name] = Participant(folder=folder, name=name,
+                                              info=info, parent=self)
         return proj.participants[name]
 
-    def add_subproject(self, name, where='.', data=None):
+    def add_subproject(self, name, where='.', paths=None):
         proj = self if where == '.' else self.subprojects[where]
         proj.participants[name] = AttrRecDict()
         proj.subprojects[name] = Project(data, name=name, parent=self)
@@ -133,7 +142,7 @@ class Project(RadarWrapper):
         return map(ptc_func, list(self.participants))
 
 
-class Participant(RadarWrapper):
+class Participant(RadarObject):
     """ A class to hold data and methods concerning participants/subjects in a
     RADAR trial. Typically intialised by opening a Project.
     """
@@ -143,16 +152,15 @@ class Participant(RadarWrapper):
             raise ValueError(('You must specify a name or else provide'
                               'a path (or paths) to the participant'))
 
-        paths = [path] if path is not None else \
-                 kwargs['path'] if 'path' in kwargs else []
+        self._paths = self._norm_paths(paths)
         self.name = name if name is not None \
                          else paths[0].split('/')[-1]
-        self.parent = kwargs['parent'] if 'parent' in kwargs else None
+        self._parent = kwargs['parent'] if 'parent' in kwargs else None
         self.info = info if info is not None else {}
         self.labels = kwargs['labels'] if 'labels' in kwargs else {}
 
         datakw = datakw if 'datakw' in kwargs else {}
-        self.data = ParticipantData(paths=paths, datakw=datakw)
+        self.data = ParticipantData(self, paths=paths, **datakw)
 
     def __repr__(self):
         return "Participant {}. of type {}".format(self.name, type(self))
@@ -178,16 +186,53 @@ class Participant(RadarWrapper):
 
         """
         if not isinstance(output, ParticipantIO):
-            output = output.create_participant(where=self.parent._get_path(),
+            output = output.create_participant(where=self._parent._get_path(),
                                                name=self.name)
         output.create_table(name=name, obj=data, *args, **kwargs)
         """
 
 
+class ParticipantData(RadarObject):
 
-class ParticipantData(object):
+    def __init__(self, participant, *args, **kwargs):
+        """
+        Parameters
+        ___________
+        participant : radar.Participant
+        data : dict
+            Dict storing data names as key and the data in a dask object as the
+            value. Strings are always assumed to be paths.
+        paths : str or list of str
+        """
+        data = kwargs.get('data')
+        self._data = data.copy() if data is not None else {}
+        self._parent = participant
+        paths = self._norm_paths(kwargs.get('paths'))
+        for path in paths:
+            self._search_path(path)
 
-    def __init__(self, *args, **kwargs):
-        print(args)
-        print(kwargs)
+    def _search_path(self, path, replace=False, **kwargs):
+        modals = io.search_path_for_data(path, **kwargs)
+        for k, v in modals.items():
+            if replace or (k not in self._data):
+                self._data[k] = modals[k]
 
+    def _load(self, name, path, **kwargs):
+        self._data[name] = io.load_data_path(path, **kwargs)
+
+    def save(self, outpath, outfmt, data_names=None):
+        print('no')
+
+    def __getitem__(self, key):
+        val = self._data[key]
+        if isinstance(val, str):
+            self._load(key, val)
+        return self._data[key]
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __getattr__(self, key):
+        if key in self._data:
+            return self[key]
+        raise AttributeError('No such attribute "{}" in {}'.format(key, self))

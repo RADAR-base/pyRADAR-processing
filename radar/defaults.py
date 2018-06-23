@@ -1,6 +1,12 @@
 import os
 import tables
 
+class Config(dict):
+    def __getitem__(self, key):
+        return dict.__getitem__(self, key) if key in self else None
+
+config = Config()
+
 # Pytables HDF5 default filter
 _FILTER = tables.Filters(complib='zlib', complevel=4, shuffle=True)
 

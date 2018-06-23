@@ -1,59 +1,105 @@
 #!/usr/bin/env python3
-import os
+import dask.core as dc
 from ..common import to_datetime
 
-class RadarTable():
-    def __init__(self, where, name, **kwargs):
-        """ Initialize a generic RadarTable. Used as a parent class for
-        actual types of data.
-        Parameters
-        _________
-        where: str
-            A path to folder containing the modality file/folder
-        name: str
-            The name of the table
-        schema: RadarSchema (optional)
-            A RADAR schema for the data modality.
-        specification: RadarSpecification (optional)
-            A RADAR specification for the data modality. Can provide time
-            columns for the value columns.
-        timecols: list of str (optional)
-            Convert these columns to datetime64
-        infer_time: bool (optional) Default: True
-            Infer time columns from column names and convert them to datetime64.
-        dtype: dict (optional)
-            A dictionary of column datatypes for the table. It is preferentially
-            taken from a given schema or specification.
-        """
-        self.where = where
-        self.name = name
-        self._schema = kwargs.get('schema')
-        self._specification = kwargs.get('specification')
-        self._timecols = kwargs.geT('timecols') if 'timecol' in kwargs else []
-        self._infer_time = kwargs.get('infer_time')
-        dtype = kwargs.get('dtype')
-        if self._schema is not None:
-            dtype = self._schema.dtype()
-        if self._specification is not None:
-            self._timecols.extend(self._specification.time_columns())
-        self.dtype = dtype
-        self._kwargs = kwargs
+def determine_protocol(path):
+    protocol = path.split('://')
+    return protocol[0] if len(protocol) > 1 else 'file'
 
-    def _load_data(self):
-        self._data = self._make_dask_df(where=self.where, name=self.name,
-                                        dtype=self.dtype, **self._kwargs)
+def load_data_path(path, **kwargs):
+    protocol = determine_protocol(path)
+    pass
 
-        if self._infer_time is not False:
-            self._timecols.extend([col for col in self._data.columns
-                                       if 'time' in col])
+def search_path_for_data(path, *args, **kwargs):
+    pass
 
-        self._timecols = list(set(self._timecols))
-        if self._timecols:
-            self._data[self._timecols] = \
-                    to_datetime(self._data[self._timecols])
 
-    def __getitem__(self, key):
-        if not hasattr(self, '_data'):
-            self._load_data()
-        return self._data[key].compute()
+
+
+
+
+
+
+
+
+
+
+def get_subprojects(self, subproject_names, **kwargs):
+    sp = AttrRecDict()
+    for path in subproject_names:
+        split_path = [f for f in path.split(os.path.sep) if f]
+        name = split_path[0]
+        sub_subproject = os.path.sep.join(split_path[1:]) if \
+            len(split_path) > 1 else None
+        if name in sp:
+            sp[name].append(sub_subproject)
+        else:
+            sp[name] = [sub_subproject]
+    for name in sp.keys():
+        self.participants[name] = AttrRecDict()
+        folder_path = os.path.join(self.path, name)
+        sub_sp = sp[name] if any(sp[name]) else None
+        sp[name] = ProjectFolder(path=folder_path,
+                                 name=name,
+                                 subproject_names=sub_sp,
+                                 participants=self.participants[name],
+                                 parent=self,
+                                 **kwargs)
+    return sp
+
+def get_participants(self, *args, **kwargs):
+    ptcs = AttrRecDict()
+    participant_names = [f for f in listfolders(self.path)
+                         if f not in self.subprojects]
+    paths = [os.path.join(self.path, name) for name in participant_names]
+    for i, name in enumerate(participant_names):
+        ptcs[name] = ParticipantFolder(folder_path=paths[i], name=name,
+                                       *args, **kwargs)
+    return ptcs
+
+def get_folders(path, subdirs):
+    if subdirs is None:
+        subdirs = []
+    folders = listfolders(path)
+    for sd in subdirs:
+        if sd not in folders:
+            continue
+        for modal in listfolders(os.path.join(path, sd)):
+            folders.append(os.path.join(sd, modal))
+    return [f for f in folders if f not in subdirs]
+
+def get_modalities(where, names, filetypes, data_funcs, whitelist=None):
+    modalities = ParticipantData()
+    for name in names:
+        if whitelist is not None:
+            if name not in whitelist:
+                continue
+        path = os.path.join(where, name)
+        fullwhere, basename = os.path.split(path)
+        modalities[basename] = data_loader(fullwhere, basename, data_funcs)
+    return modalities
+
+def data_loader(where, name, data_funcs):
+    files = listfiles(os.path.join(where, name))
+    if 'schema.json' in files:
+        files.remove('schema.json')
+    filetype = determine_filetype(files)
+    if filetype in data_funcs:
+        return data_funcs[filetype](where, name)
+    else:
+        return None
+
+def determine_filetype(files):
+    def split_filename(f):
+        f = os.path.basename(f)
+        f_split = f.split(os.path.extsep)
+        if len(f_split) > 1:
+            return os.path.extsep.join(f_split[1:])
+        else:
+            return ''
+    extensions = [split_filename(f) for f in files]
+    count = Counter(extensions)
+    if len(count) == 0:
+        return ''
+    return max(extensions, key=count.get)
 
