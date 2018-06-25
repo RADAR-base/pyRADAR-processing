@@ -2,28 +2,6 @@
 import dask.core as dc
 from ..common import to_datetime
 
-def determine_protocol(path):
-    protocol = path.split('://')
-    return protocol[0] if len(protocol) > 1 else 'file'
-
-def load_data_path(path, **kwargs):
-    protocol = determine_protocol(path)
-    pass
-
-def search_path_for_data(path, *args, **kwargs):
-    pass
-
-
-
-
-
-
-
-
-
-
-
-
 def get_subprojects(self, subproject_names, **kwargs):
     sp = AttrRecDict()
     for path in subproject_names:

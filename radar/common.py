@@ -2,6 +2,7 @@ import os
 import logging
 import numpy as np
 from datetime import datetime
+from .defaults import config
 
 def abs_path(path):
     if not (os.path.isabs(path) or len(path.split('://')) > 1):
