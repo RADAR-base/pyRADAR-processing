@@ -23,13 +23,13 @@ class Subject(Resource):
         return self.get('', **params)
 
     def create(self, **body):
-        return self.request('POST', data=body)
+        return self.request('POST', json=body)
 
     def update(self, **body):
-        return self.request('PUT', data=body)
+        return self.request('PUT', json=body)
 
     def discontinue(self, **body):
-        return self.request('PUT', endpoint='discontinue', data=body)
+        return self.request('PUT', endpoint='discontinue', json=body)
 
     def delete(self, login):
         return self.request('DELETE', login)
@@ -45,7 +45,7 @@ class Subject(Resource):
             raise ValueError(('You must supply either a Source Type ID, or the'
                               'combination of (sourceTypeProducer,'
                               'sourceTypeModel, sourceTypeCatalogVersion)'))
-        return self.request('POST', endpoint=login, data=body)
+        return self.request('POST', endpoint=login, json=body)
 
 
 class Project(Resource):
@@ -62,13 +62,13 @@ class Project(Resource):
         body['projectName'] = projectName
         body['description'] = description
         body['location'] = location
-        return self.request('POST', data=body)
+        return self.request('POST', json=body)
 
     def update(self, project_name, description, location, **body):
         body['projectName'] = project_name
         body['description'] = description
         body['location'] = location
-        return self.request('PUT', data=body)
+        return self.request('PUT', json=body)
 
     def delete(self, project_name):
         return self.request('DELETE', projectName)
@@ -104,13 +104,13 @@ class Source(Resource):
         body['assigned'] = assigned
         body['sourceName'] = source_name
         body['sourceType'] = source_type
-        return self.request('POST', data=body)
+        return self.request('POST', json=body)
 
     def update(self, source_name, source_type, assigned, **body):
         body['assigned'] = assigned
         body['sourceName'] = source_name
         body['sourceType'] = source_type
-        return self.request('PUT', data=body)
+        return self.request('PUT', json=body)
 
     def delete(self, source_name):
         return self.request('DELETE', source_name)
@@ -138,7 +138,7 @@ class SourceType(Resource):
         body['catalogVersion'] = version
         body['canRegisterDynamically'] = can_register_dynamically
         body['sourceTypeScope'] = scope
-        return self.request('POST', data=body)
+        return self.request('POST', json=body)
 
     def update(self, producer, model, version, can_register_dynamically, scope,
                **body):
@@ -147,7 +147,7 @@ class SourceType(Resource):
         body['catalogVersion'] = version
         body['canRegisterDynamically'] = can_register_dynamically
         body['sourceTypeScope'] = scope
-        return self.request('PUT', data=body)
+        return self.request('PUT', json=body)
 
     def delete(self, producer, model, version):
         endpoint = '/'.join([producer, model, version])
@@ -166,11 +166,11 @@ class SourceData(Resource):
 
     def create(self, source_data_type, **body):
         body['sourceDataType'] = source_data_type
-        return self.request('POST', data=body)
+        return self.request('POST', json=body)
 
     def update(self, source_data_type, **body):
         body['sourceDataType'] = source_data_type
-        return self.request('PUT', data=body)
+        return self.request('PUT', json=body)
 
     def delete(self, source_data_name):
         return self.request('DELETE', source_data_name)
