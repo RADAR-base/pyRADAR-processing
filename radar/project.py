@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-from .io import *
-from .common import abs_path
+from . import io
+from .common import abs_path, log
 from .generic import AttrRecDict
 
-
 class RadarObject():
+    _parent = None
     def _get_attr_or_parents(self, attr):
         if hasattr(self, attr) and getattr(self, attr) is not None:
             res = getattr(self, attr)
-        elif getattr(self, parent) is None:
+        elif getattr(self, '_parent') is None:
             res = None
         else:
             res =  self._parent._get_attr_or_parents(attr)
@@ -54,17 +54,21 @@ class RadarObject():
 class Project(RadarObject):
     """
     """
-    def __init__(self, paths=None, **kwargs):
-        self.name = kwargs['name'] if 'name' in kwargs else ''
-        self._paths = self._norm_paths(paths)
-        self._parent = kwargs['parent'] if 'parent' in kwargs else None
+    def __init__(self, name='', parent=None, paths=None,
+                 schemas=None, specifications=None,
+                 armt_definitions=None, armt_protocols=None, **kwargs):
+        self.name = name
+        self._parent = parent
+        self._paths = []
+        self.schemas = schemas
+        self.specifications = specifications
+        self.armt_definitions = armt_definitions
+        self.armt_protocols = armt_protocols
         self.subprojects = AttrRecDict()
-        self.participants = self._parent.participants[self.name] if self.parent\
-                            else AttrRecDict()
-        self.schemas = kwargs['schemas'] if 'schemas' in kwargs else \
-                       default_schemas
-        self.specifications = kwargs['specifications'] if 'specifications'\
-                              in kwargs else default_schemas
+        self.participants = self._parent.participants[self.name] if \
+                self._parent else AttrRecDict()
+        for path in self._norm_paths(paths):
+            self.add_path(path, **kwargs)
 
     def __getitem__(self, key):
         if key in self.subprojects:
@@ -86,44 +90,67 @@ class Project(RadarObject):
             """
         pass
 
-    def _get_subprojects(self, subproject_data_dict):
-        """OLD
-        for sp_name, sp_data in subproject_data_dict.items():
-            self.add_subproject(sp_name, data=sp_data)
-        """
-        pass
-
-    def _get_participants(self, participant_data_dict):
-        """OLD
-        for ptc_name, ptc_data in participant_data_dict.items():
-            if not isinstance(ptc_data, AttrRecDict):
-                if not isinstance(ptc_data, dict):
-                    ptc_data = \
-                        ptc_data.get_data_dict(specifications=default_specs,
-                                               schemas=default_schemas)
-                self.add_participant(ptc_name, data=ptc_data)
-                """
-        pass
-
-    def add_participant(self, name, where='.', data=None, info=None):
+    def add_participant(self, name, where='.', *args, **kwargs):
         proj = self if where == '.' else self.subprojects[where]
-        proj.participants[name] = Participant(folder=folder, name=name,
-                                              info=info, parent=self)
+        if name in proj.participants:
+            log.debug('participant {} already exists in project {}'\
+                       .format(name, proj.name))
+        else:
+            proj.participants[name] = Participant(name=name, parent=self,
+                                                   *args, **kwargs)
         return proj.participants[name]
 
-    def add_subproject(self, name, where='.', paths=None):
+    def add_subproject(self, name, where='.', *args, **kwargs):
         proj = self if where == '.' else self.subprojects[where]
-        proj.participants[name] = AttrRecDict()
-        proj.subprojects[name] = Project(data, name=name, parent=self)
+        if name in proj.subprojects:
+            log.debug('Subproject {} already exists in project {}'\
+                      .format(name, proj.name))
+        elif name in proj.participants:
+            log.error('The subproject name {} is already'.format(name) +\
+                      'used as a participant in project {}'.format(proj.name))
+            return None
+        else:
+            proj.participants[name] = AttrRecDict()
+            proj.subprojects[name] = Project(name=name, parent=self,
+                                             *args, **kwargs)
         return proj.subprojects[name]
 
-    def __str__(self):
-        return 'RADAR {}: {}, {} participants'.format(
-            'Subproject' if getattr(self, 'parent') is None else 'Project',
-            self.name,
-            len(self.participants))
+    def _parse_path(self, path, subprojects=None, participants=None,
+                    blacklist=None, **kwargs):
+        dir_dict = io.core.get_project_dir(path,
+                                           subprojects=subprojects,
+                                           participants=participants,
+                                           blacklist=blacklist)
+        return dir_dict
+
+    def _add_subprojects(self, paths, **kwargs):
+        for p in paths:
+            name = p.split('/')[-1]
+            sp = self.add_subproject(name, **kwargs)
+            sp.add_path(p)
+
+    def _add_participants(self, paths, **kwargs):
+        for p in paths:
+            name = p.split('/')[-1]
+            ptc = self.add_participant(name, **kwargs)
+            ptc.add_path(p, **kwargs.get('datakw', {}))
+
+    def add_path(self, path, **kwargs):
+        self._paths.append(path)
+        dir_dict = self._parse_path(path, **kwargs)
+        self._add_subprojects(dir_dict['subprojects'])
+        self._add_participants(dir_dict['participants'],
+                               **kwargs.get('ptckw', {}))
 
     def __repr__(self):
+        return 'RADAR {} of type {}: {}, {} participants'\
+                .format('Subproject' if getattr(self, '_parent') is None
+                        else 'Project',
+                        type(self),
+                        self.name,
+                        len(self.participants))
+
+    def __str__(self):
         info_string = '''member of {class}
         Name: {name}
         Subprojects: {subprojs}
@@ -146,24 +173,32 @@ class Participant(RadarObject):
     """ A class to hold data and methods concerning participants/subjects in a
     RADAR trial. Typically intialised by opening a Project.
     """
-    def __init__(self, name=None, path=None, info=None, **kwargs):
-
+    def __init__(self, name=None, paths=None, info=None, **kwargs):
         if not (name or folder or 'paths' in kwargs):
             raise ValueError(('You must specify a name or else provide'
                               'a path (or paths) to the participant'))
 
-        self._paths = self._norm_paths(paths)
         self.name = name if name is not None \
                          else paths[0].split('/')[-1]
-        self._parent = kwargs['parent'] if 'parent' in kwargs else None
-        self.info = info if info is not None else {}
-        self.labels = kwargs['labels'] if 'labels' in kwargs else {}
-
-        datakw = datakw if 'datakw' in kwargs else {}
-        self.data = ParticipantData(self, paths=paths, **datakw)
+        self._parent = kwargs.get('parent', None)
+        self.info = kwargs.get('info', {}) 
+        self.labels = kwargs.get('labels', {})
+        self.data = ParticipantData(self, **kwargs.get('datakw', {}))
+        self._paths = []
+        paths = [paths] if type(paths) == 'str' else\
+                [] if paths is None else paths
+        for p in paths:
+            self.add_path(p, **kwargs.get('datakw', {}))
 
     def __repr__(self):
         return "Participant {}. of type {}".format(self.name, type(self))
+
+    def add_path(self, path, **kwargs):
+        self._paths.append(self._norm_paths(path))
+        self.data._search_path(path, **kwargs)
+
+    def reparse_data(self, **datakw):
+        self.data = ParticipantData(self, paths=self._paths, **datakw)
 
     def export_data(self, data=None, names=None, project_path=None,
                     filetype=None, *args, **kwargs):
@@ -204,21 +239,20 @@ class ParticipantData(RadarObject):
             value. Strings are always assumed to be paths.
         paths : str or list of str
         """
-        data = kwargs.get('data')
-        self._data = data.copy() if data is not None else {}
         self._parent = participant
-        paths = self._norm_paths(kwargs.get('paths'))
+        self._data = kwargs.pop('data', {})
+        paths = self._norm_paths(kwargs.pop('paths', None))
         for path in paths:
-            self._search_path(path)
+            self._search_path(path, **kwargs)
 
     def _search_path(self, path, replace=False, **kwargs):
-        modals = io.search_path_for_data(path, **kwargs)
+        modals = io.core.search_dir_for_data(path, **kwargs)
         for k, v in modals.items():
             if replace or (k not in self._data):
                 self._data[k] = modals[k]
 
     def _load(self, name, path, **kwargs):
-        self._data[name] = io.load_data_path(path, **kwargs)
+        self._data[name] = io.core.load_data_path(path, **kwargs)
 
     def save(self, outpath, outfmt, data_names=None):
         print('no')
@@ -236,3 +270,14 @@ class ParticipantData(RadarObject):
         if key in self._data:
             return self[key]
         raise AttributeError('No such attribute "{}" in {}'.format(key, self))
+
+"""
+class DelayedData(RadarObject):
+    def __init__(self, parent, *args, **kwargs):
+        data = kwargs.get('data')
+        self._data = data.copy() if data is not None else {}
+        self._parent = parent
+        paths = self.norm_paths(kwargs.get('paths'))
+        for path in paths:
+            self._search_path(path)
+"""

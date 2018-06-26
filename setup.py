@@ -14,7 +14,7 @@ setup(name='radarstudy',
           'pandas',
           'matplotlib',
           'bokeh',
-          'tables',
+          'dask',
       ],
       include_package_data=True
 )

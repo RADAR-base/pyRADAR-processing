@@ -24,8 +24,10 @@ class LocalFileSystem(daskLFC):
         Returns a list of relative paths to files within the given path. If path
         is not given, uses the current working directory.
         """
-        return self.listdir_conditional(path, os.path.isfile)
+        return self.listdir_conditional(path, self.isfile)
 
-    def path_is_file():
-        return 0
+    def isfile(self, path):
+        return os.path.isfile(path)
 
+    def isdir(self, path):
+        return os.path.isdir(path)
