@@ -1,5 +1,4 @@
 import os
-import tables
 
 class Config(dict):
     def __getitem__(self, key):
@@ -7,6 +6,7 @@ class Config(dict):
 
 config = Config()
 
+"""
 # Pytables HDF5 default filter
 _FILTER = tables.Filters(complib='zlib', complevel=4, shuffle=True)
 
@@ -23,3 +23,4 @@ TIME_COLS = ('value.time', 'value.timeReceived')
 
 # Logging
 FILE_LOGGING = False
+"""
