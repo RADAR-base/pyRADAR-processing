@@ -117,10 +117,10 @@ class Project(RadarObject):
 
     def _parse_path(self, path, subprojects=None, participants=None,
                     blacklist=None, **kwargs):
-        dir_dict = io.core.get_project_dir(path,
-                                           subprojects=subprojects,
-                                           participants=participants,
-                                           blacklist=blacklist)
+        dir_dict = io.generic.get_project_dir(path,
+                                              subprojects=subprojects,
+                                              participants=participants,
+                                              blacklist=blacklist)
         return dir_dict
 
     def _add_subprojects(self, paths, **kwargs):
@@ -246,13 +246,13 @@ class ParticipantData(RadarObject):
             self._search_path(path, **kwargs)
 
     def _search_path(self, path, replace=False, **kwargs):
-        modals = io.core.search_dir_for_data(path, **kwargs)
+        modals = io.generic.search_dir_for_data(path, **kwargs)
         for k, v in modals.items():
             if replace or (k not in self._data):
                 self._data[k] = modals[k]
 
     def _load(self, name, path, **kwargs):
-        self._data[name] = io.core.load_data_path(path, **kwargs)
+        self._data[name] = io.generic.load_data_path(path, **kwargs)
 
     def save(self, outpath, outfmt, data_names=None):
         print('no')

@@ -1,83 +1,147 @@
 #!/usr/bin/env python3
-import dask.core as dc
-from ..common import to_datetime
+from collections import Counter
+from dask.bytes.utils import infer_compression, infer_storage_options
+from ..common import log
+from .core import get_fs
 
-def get_subprojects(self, subproject_names, **kwargs):
-    sp = AttrRecDict()
-    for path in subproject_names:
-        split_path = [f for f in path.split(os.path.sep) if f]
-        name = split_path[0]
-        sub_subproject = os.path.sep.join(split_path[1:]) if \
-            len(split_path) > 1 else None
-        if name in sp:
-            sp[name].append(sub_subproject)
-        else:
-            sp[name] = [sub_subproject]
-    for name in sp.keys():
-        self.participants[name] = AttrRecDict()
-        folder_path = os.path.join(self.path, name)
-        sub_sp = sp[name] if any(sp[name]) else None
-        sp[name] = ProjectFolder(path=folder_path,
-                                 name=name,
-                                 subproject_names=sub_sp,
-                                 participants=self.participants[name],
-                                 parent=self,
-                                 **kwargs)
-    return sp
+def f_cond(files, whitelist=None, blacklist=None):
+    if whitelist is None:
+        whitelist = files
+    if blacklist is None:
+        blacklist = []
+    return [f for f in files if f in whitelist and f not in blacklist]
 
-def get_participants(self, *args, **kwargs):
-    ptcs = AttrRecDict()
-    participant_names = [f for f in listfolders(self.path)
-                         if f not in self.subprojects]
-    paths = [os.path.join(self.path, name) for name in participant_names]
-    for i, name in enumerate(participant_names):
-        ptcs[name] = ParticipantFolder(folder_path=paths[i], name=name,
-                                       *args, **kwargs)
-    return ptcs
+def out_paths(path, sep, files, *args, **kwargs):
+    files = f_cond(files, *args, **kwargs)
+    return [path.rstrip(sep) + sep + f for f in files]
 
-def get_folders(path, subdirs):
-    if subdirs is None:
-        subdirs = []
-    folders = listfolders(path)
-    for sd in subdirs:
-        if sd not in folders:
-            continue
-        for modal in listfolders(os.path.join(path, sd)):
-            folders.append(os.path.join(sd, modal))
-    return [f for f in folders if f not in subdirs]
+def get_project_dir(path, subprojects=None, participants=None,
+                         blacklist=None):
 
-def get_modalities(where, names, filetypes, data_funcs, whitelist=None):
-    modalities = ParticipantData()
-    for name in names:
-        if whitelist is not None:
-            if name not in whitelist:
-                continue
-        path = os.path.join(where, name)
-        fullwhere, basename = os.path.split(path)
-        modalities[basename] = data_loader(fullwhere, basename, data_funcs)
-    return modalities
+    fs = get_fs(**infer_storage_options(path))
+    folders = fs.list_folders(path)
+    # files = fs.list_files(path)
 
-def data_loader(where, name, data_funcs):
-    files = listfiles(os.path.join(where, name))
-    if 'schema.json' in files:
-        files.remove('schema.json')
-    filetype = determine_filetype(files)
-    if filetype in data_funcs:
-        return data_funcs[filetype](where, name)
+    blacklist = blacklist if blacklist is not None else []
+    subprojects = subprojects if subprojects is not None else []
+
+    sp = out_paths(path, fs.sep, folders,
+                   whitelist=subprojects if subprojects else [],
+                   blacklist = blacklist)
+    ptc = out_paths(path, fs.sep, folders,
+                    whitelist = participants,
+                    blacklist = subprojects + blacklist)
+
+    return {'subprojects': sp,
+            'participants': ptc}
+
+
+def infer_file_format(f):
+    compression = infer_compression(f)
+    i = 2 if compression else 1
+    file_split = f.split('.')
+    file_format = file_split[-i]
+    return [file_format, compression]
+
+def infer_folder_format(f, include='.*', exclude='.*schema.json'):
+    include = re.compile(include)
+    exclude = re.compile(exclude)
+    exts_comps = list(zip(*(infer_file_format(x) for x in fs.list_files(f)
+                           if include.match(x) and not exclude.match(x))))
+    exts, comps = ext_comps or [[None], [None]]
+    fmt = Counter(formats).most_common(1)[0][0]
+    comp = Counter(compressions).most_common(1)[0][0],
+
+    if len(set(formats)) > 1:
+        log.warning('Not all file formats in {} are the same'.format(f))
+    if len(set(compressions)) > 1:
+        log.warning('Not all compressions in {} are the same'.format(f))
+
+    return out
+
+
+def infer_data_format(f, include='.*', exclude='.*schema.json'):
+    fs = get_fs(**infer_storage_options(f))
+    name = f.split(fs.sep)[0]
+    isfile = fs.isfile(f)
+    if isfile:
+        ext, comp = infer_file_format(f)
     else:
-        return None
+        ext, comp = infer_folder_format(f, include, exclude)
+    return (name, ext, comp, isfile)
 
-def determine_filetype(files):
-    def split_filename(f):
-        f = os.path.basename(f)
-        f_split = f.split(os.path.extsep)
-        if len(f_split) > 1:
-            return os.path.extsep.join(f_split[1:])
+_data_load_funcs = {}
+def get_data_func(name, ext, compression, isfile):
+    ext_comp = (ext, compression)
+    if name in _data_load_funcs:
+        return _data_load_funcs[name]
+    elif ext_comp in _data_load_funcs:
+        return _data_load_funcs[ext_comp]
+
+    if ext == 'csv':
+        if compression:
+            func = lambda path, *args, **kwargs: \
+                    dd.read_csv(path.rstrip('/') + '/' + '*.csv.*',
+                                compression=compression, blocksize=None,
+                                *args, **kwargs)
         else:
-            return ''
-    extensions = [split_filename(f) for f in files]
-    count = Counter(extensions)
-    if len(count) == 0:
-        return ''
-    return max(extensions, key=count.get)
+            func = lambda path, *args, **kwargs: \
+                    dd.read_csv(path.rstrip('/') + '/' + '*.csv',
+                                *args, **kwargs)
+    elif ext == 'tsv':
+        if compression:
+            func = lambda path, *args, **kwargs: \
+                    dd.read_tsv(path.rstrip('/') + '/' + '*.tsv.*',
+                                compression=compression, blocksize=None,
+                                *args, **kwargs)
+        else:
+            func = lambda path, *args, **kwargs: \
+                    dd.read_tsv(path.rstrip('/') + '/' + '.tsv',
+                                *args, **kwargs)
+    elif ext == 'json':
+        if compression:
+            func = lambda path, *args, **kwargs: \
+                    dd.read_json(path.rstrip('/') + '/' + '*.json.*',
+                                compression=compression, blocksize=None,
+                                *args, **kwargs)
+        else:
+            func = lambda path, *args, **kwargs: \
+                    dd.read_json(path.rstrip('/') + '/' + '*.json',
+                                *args, **kwargs)
+    elif ext == 'parquet' or ext == 'pq':
+        func = dd.read_parquet
+    elif ext == 'orc':
+        func = dd.read_orc
+    else:
+        log.error('Unsupported data format "{}" or compression "{}"'\
+                  .format(ext, compression))
+        func = lambda *args, **kwargs: None
+    _data_load_funcs[ext_comp] = func
+    return func
 
+def load_data_path(path, **kwargs):
+    func = get_data_func(*infer_data_format(path))
+    return func(path, **kwargs)
+
+def search_dir_for_data(path, whitelist=None, blacklist=None,
+                        include=None, exclude=None, **kwargs):
+    subdirs = kwargs.pop('subdirs', [])
+    blacklist = blacklist + subdirs if blacklist is not None else None
+    fs = get_fs(**infer_storage_options(path))
+    out_paths = listdir(path, whitelist=whitelist, blacklist=blacklist,
+                        include=include, exclude=exclude)
+    for sd in subdirs:
+        subpath = path.rstrip(fs.sep) + fs.sep + sd
+        if fs.isdir(subpath):
+            out_paths.extend(listdir(subpath, **kwargs))
+
+    return {p.split(fs.sep)[-1]: p for p in out_paths}
+
+def listdir(path, whitelist=None, blacklist=None, include=None, exclude=None):
+    fs = get_fs(**infer_storage_options(path))
+    files = fs.list_files(path) + fs.list_folders(path)
+    blacklist = blacklist if blacklist is not None else []
+    whitelist = whitelist if whitelist is not None else files
+    return out_paths(path, fs.sep, files,
+                     whitelist=whitelist,
+                     blacklist=blacklist)
