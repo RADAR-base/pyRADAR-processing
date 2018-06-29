@@ -254,8 +254,11 @@ class ParticipantData(RadarObject):
     def _load(self, name, path, **kwargs):
         self._data[name] = io.generic.load_data_path(path, **kwargs)
 
-    def save(self, outpath, outfmt, data_names=None):
-        print('no')
+    def save(self, outpath, outfmt, data_names=None, **kwargs):
+        if data_names is None:
+            data_names = list(self)
+        for data in data_names:
+            self[data]
 
     def __getitem__(self, key):
         val = self._data[key]
@@ -269,7 +272,12 @@ class ParticipantData(RadarObject):
     def __getattr__(self, key):
         if key in self._data:
             return self[key]
+        elif hasattr(self._data, key):
+            return getattr(self._data, key)
         raise AttributeError('No such attribute "{}" in {}'.format(key, self))
+
+    def __iter__(self):
+        return iter(self._data)
 
 """
 class DelayedData(RadarObject):

@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import re
-import dask.dataframe as dd
 from functools import lru_cache
 from dask.utils import import_required
 from dask.bytes.core import _filesystems, get_fs_token_paths

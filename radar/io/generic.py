@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import re
+import dask.dataframe as dd
 from collections import Counter
 from dask.bytes.utils import infer_compression, infer_storage_options
 from ..common import log
@@ -37,27 +39,26 @@ def get_project_dir(path, subprojects=None, participants=None,
 
 
 def infer_file_format(f):
-    compression = infer_compression(f)
-    i = 2 if compression else 1
+    comp = infer_compression(f)
+    i = 2 if comp else 1
     file_split = f.split('.')
-    file_format = file_split[-i]
-    return [file_format, compression]
+    ext = file_split[-i]
+    return [ext, comp]
 
-def infer_folder_format(f, include='.*', exclude='.*schema.json'):
+def infer_folder_format(path, include='.*', exclude='.*schema.json'):
     include = re.compile(include)
     exclude = re.compile(exclude)
-    exts_comps = list(zip(*(infer_file_format(x) for x in fs.list_files(f)
+    fs = get_fs(**infer_storage_options(path))
+    exts_comps = list(zip(*(infer_file_format(x) for x in fs.list_files(path)
                            if include.match(x) and not exclude.match(x))))
-    exts, comps = ext_comps or [[None], [None]]
-    fmt = Counter(formats).most_common(1)[0][0]
-    comp = Counter(compressions).most_common(1)[0][0],
-
-    if len(set(formats)) > 1:
-        log.warning('Not all file formats in {} are the same'.format(f))
-    if len(set(compressions)) > 1:
-        log.warning('Not all compressions in {} are the same'.format(f))
-
-    return out
+    exts, comps = exts_comps or [[None], [None]]
+    ext = Counter(exts).most_common(1)[0][0]
+    comp = Counter(comps).most_common(1)[0][0]
+    if len(set(exts)) > 1:
+        log.warning('Not all file formats in {} are the same'.format(path))
+    if len(set(comps)) > 1:
+        log.warning('Not all compressions in {} are the same'.format(path))
+    return [ext, comp]
 
 
 def infer_data_format(f, include='.*', exclude='.*schema.json'):
@@ -68,7 +69,7 @@ def infer_data_format(f, include='.*', exclude='.*schema.json'):
         ext, comp = infer_file_format(f)
     else:
         ext, comp = infer_folder_format(f, include, exclude)
-    return (name, ext, comp, isfile)
+    return [name, ext, comp, isfile]
 
 _data_load_funcs = {}
 def get_data_func(name, ext, compression, isfile):
