@@ -45,12 +45,19 @@ def infer_file_format(f):
     ext = file_split[-i]
     return [ext, comp]
 
-def infer_folder_format(path, include='.*', exclude='.*schema.json'):
-    include = re.compile(include)
-    exclude = re.compile(exclude)
+def infer_folder_format(path, include=None, exclude='.*schema.json'):
     fs = get_fs(**infer_storage_options(path))
+    folder_split = path.split(fs.sep)[-1].split('.')
+    if len(folder_split) > 1:
+        return [folder_split[-1], None]
+
+    if include is not None:
+        include = re.compile(include)
+    if exclude is not None:
+        exclude = re.compile(exclude)
     exts_comps = list(zip(*(infer_file_format(x) for x in fs.list_files(path)
-                           if include.match(x) and not exclude.match(x))))
+                           if (include is None or include.match(x))
+                           and (exclude is None or not exclude.match(x)))))
     exts, comps = exts_comps or [[None], [None]]
     ext = Counter(exts).most_common(1)[0][0]
     comp = Counter(comps).most_common(1)[0][0]
@@ -78,6 +85,10 @@ def get_data_func(name, ext, compression, isfile):
         return _data_load_funcs[name]
     elif ext_comp in _data_load_funcs:
         return _data_load_funcs[ext_comp]
+
+    if name == 'IMEC':
+        from .imec import Imec
+        func = Imec
 
     if ext == 'csv':
         if compression:

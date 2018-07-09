@@ -3,10 +3,10 @@ import json
 import requests
 import numpy as np
 import pandas as pd
+from functools import lru_cache
 
 class Object(object):
     pass
-
 
 class Protocol(object):
     def __init__(self, json_protocol):
@@ -30,9 +30,14 @@ class Protocol(object):
         self.reminders.__dict__ = prot['reminders']
 
 
-    def _get_definition_commits(self, cache=True):
-        if hasattr(self.questionnaire, '_commits'):
-            return self.questionnaire._commits
+    @lru_cache(maxsize=2)
+    def _get_definition_commits(self):
+        """ A function to retrieve git commits from the Protocol object repo
+        Returns
+        _______
+        commits : pd.DataFrame
+            Dataframe with a 'date' and 'sha' column for each git commit
+        """
         url = 'https://api.github.com/repos/{}/{}/commits?path={}&per_page=100'\
                 .format(self.questionnaire.github_owner,
                         self.questionnaire.github_repo,
@@ -45,14 +50,23 @@ class Protocol(object):
                                       for c in c_json])
         commits['date'] = pd.to_datetime(commits['date'])
         commits.set_index('date', inplace=True)
-        if cache:
-            self.questionnaire._commits = commits
         return commits
 
+    @lru_cache(maxsize=64)
+    def get_definition(self, commit='master'):
+        """ Retrieves the aRMT definition corresponding to a particular commit
+        Parameters
+        _________
+        commit : str
+            sha of the commit. (default: 'master')
 
-    def get_definition(self, commit='master', cache=True):
-        if cache and commit in self.questionnaire.definitions:
-            return self.questionnaire.definitions[commit]
+        Returns
+        ________
+        definition : list of dicts
+            Definition parsed by json.loads.
+            Normally this should be a list containing dicts for each question.
+
+        """
         url = 'https://raw.githubusercontent.com/{}/{}/{}/{}'\
                 .format(self.questionnaire.github_owner,
                        self.questionnaire.github_repo,
@@ -61,13 +75,22 @@ class Protocol(object):
         r = requests.get(url)
         r.raise_for_status()
         definition = json.loads(r.text)
-
-        if cache:
-            self.questionnaire.definitions[commit] = definition
         return definition
 
-    def get_definition_before_date(self, date, cache=True):
-        commits = self._get_definition_commits(cache=cache)
+    def get_definition_before_date(self, date):
+        """ Retrieves a defintion directly prior to a given date
+        Parameters
+        __________
+        date : str or datetime/Timestamp object
+            Use this date to get the definition in use at that time.
+
+        Returns
+        ________
+        definition : list of dicts
+            Definition parsed by json.loads.
+            Normally this should be a list containing dicts for each question.
+        """
+        commits = self._get_definition_commits()
         idx = commits[commits.index < date].index
         if len(idx) == 0:
             raise ValueError(('There are no definition commits for "{}" in '
@@ -76,8 +99,7 @@ class Protocol(object):
                                   self.questionnaire.github_repo,
                                   date)))
         sha = commits.loc[idx.max()]['sha']
-        return self.get_definition(commit=sha, cache=cache)
-
+        return self.get_definition(commit=sha)
 
     def protocol_timedelta(self):
         return pd.Timedelta('{} {}'.format(self.repeat_protocol.amount,

@@ -278,14 +278,3 @@ class ParticipantData(RadarObject):
 
     def __iter__(self):
         return iter(self._data)
-
-"""
-class DelayedData(RadarObject):
-    def __init__(self, parent, *args, **kwargs):
-        data = kwargs.get('data')
-        self._data = data.copy() if data is not None else {}
-        self._parent = parent
-        paths = self.norm_paths(kwargs.get('paths'))
-        for path in paths:
-            self._search_path(path)
-"""

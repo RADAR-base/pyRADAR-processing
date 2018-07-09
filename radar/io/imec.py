@@ -1,73 +1,86 @@
 #!/usr/bin/env python3
-import tables
-import numpy as np
+import h5py
 import pandas as pd
 import dask.array as da
-import matplotlib.pyplot as plt
+import dask.dataframe as dd
+from dask.bytes.utils import infer_storage_options
+from .core import get_fs
 
 class Imec(object):
-    def __init__(self, imec_file_path):
-        self._h5 = tables.File(imec_file_path)
-        self._radar = self._h5.root.Devices.Radar
+    def __init__(self, path):
+        fs = get_fs(**infer_storage_options(path))
+        self._h5s = [h5py.File(h5) for h5 in
+                     fs.glob(path + fs.sep + '*' + fs.sep + '*.h5')]
+        self._start_times = []
+        for h5 in self._h5s:
+            start_time = h5['/Devices/Radar'].attrs.get('#DateTime')
+            if start_time is None:
+                raise ValueError(('The given IMEC h5 file does not have '
+                                  'a date/time attribute. Please ensure it '
+                                  'was converted correctly'))
+            else:
+                self._start_times.append(
+                        pd.Timestamp(bytes.decode(start_time)))
 
-        if hasattr(self._radar._v_attrs, '#DateTime'):
-            self._start_time = pd.Timestamp(bytes.decode(
-                getattr(self._radar._v_attrs, '#DateTime')))
-        else:
-            raise ValueError('The given IMEC file does not have a date/time')
-        self._h5arrs = {k: getattr(self._radar.Signal, k).Data
-                        for k in self._radar.Signal._v_children}
-        self.modalities = {
-                'Accelerometer': ['ACC-X', 'ACC-Y', 'ACC-Z'],
-                'Battery': ['Battery'],
-                'ECG': ['ECG'],
-                'EMG': ['EMG'],
-                'GSR': ['GSR-2', 'GSR-1'],
-                'PIE': ['PIE'],
-                'Temp': ['Temp'],
+        self._dsets = {
+                k: [h5['/Devices/Radar/Signal/{}/Data'.format(k)]
+                    for h5 in self._h5s]
+                for k in self._h5s[0]['/Devices/Radar/Signal/']
                 }
-        self._freqs = {}
-        self._timecols = {}
-        for modal, arrs in self.modalities.items():
-            self._timecols[modal] = self._make_timecol(arrs[0])
-            self._freqs[modal] = self.signal_freq(arrs[0])
 
-    def signal_freq(self, key):
-        return float(getattr(getattr(self._radar.Signal, key)._v_attrs,
-                             '#Freq'))
+        self._signals = {
+                k: da.stack(
+                    [da.from_array(dset, chunks=self._signal_chunks(k))
+                        for dset in self._dsets[k]], axis=0).transpose()
+                    for k, v in self._dsets.items()
+                }
 
-    def _make_timecol(self, arr):
-        col_len = len(self._h5arrs[arr])
-        col_freq = self.signal_freq(arr)
-        chunks = self._h5arrs[arr].chunkshape
-        col = da_date_idx(self._start_time, col_len, col_freq, chunks)
-        return col
+        self._timecols = {
+                'accelerometer':self._make_timecols('ACC-X'),
+                'electrode' : self._make_timecols('ECG'),
+                'other': self._make_timecols('Battery'),
+                }
+        self.imec_acceleration = \
+                self._df_from_signals(['ACC-X', 'ACC-Y', 'ACC-Z'],
+                                      ['x', 'y', 'z'],
+                                      'accelerometer')
+        self.imec_gsr = \
+                self._df_from_signals(['GSR-1', 'GSR-2'],
+                                      ['GSR_1', 'GSR_2'],
+                                      'electrode')
+        self.imec_ecg = \
+            self._df_from_signals(['ECG'], ['ECG'], 'electrode')
+        self.imec_emg = \
+            self._df_from_signals(['EMG'], ['EMG'], 'electrode')
+        self.imec_battery = \
+            self._df_from_signals(['Battery'], ['battery'], 'other')
+        self.imec_temperature = \
+            self._df_from_signals(['Temp'], ['temperature'], 'other')
+        self.imec_pie = \
+            self._df_from_signals(['PIE'], ['PIE'], 'other')
 
-    def get_df(self, modality, index):
-        cols = {'time': self._timecols[modality][index].compute()}
-        cols.update({name: self._h5arrs[name][index]
-                     for name in self.modalities[modality]})
-        return pd.DataFrame(cols)
-
-    def get_df_time(self, modality, start_time, stop_time, sample_rate=None):
-        dateidx = DateToIdx(self._start_time, self._freqs[modality])
-        start_idx = dateidx(start_time)
-        start_idx = 0 if start_idx < 0 else start_idx
-        stop_idx = dateidx(stop_time)
-        index = slice(start_idx, stop_idx, None)
-        df = self.get_df(modality, index)
-        df.set_index('time', inplace=True)
-        if sample_rate is not None:
-            df = df.resample(sample_rate).pad()
+    def _df_from_signals(self, signals, names, timecol):
+        arrs = [self._signals[sig] for sig in signals]
+        catarr = da.concatenate(arrs, axis=1)
+        df = dd.from_dask_array(catarr, columns=names)
+        # df['time'] = dd.from_dask_array(self._timecols[timecol])
         return df
 
-    def plot_timespan(self, modality, start_time, stop_time, sample_rate=None):
-        df = self.get_df_time(modality, start_time, stop_time, sample_rate)
-        fig = plt.figure()
-        plt.plot(df)
-        plt.legend(df.columns)
-        return fig
+    def _signal_freq(self, key):
+        h5 = self._h5s[0]
+        return float(h5['/Devices/Radar/Signal/{}'.format(key)].attrs['#Freq'])
 
+    def _signal_chunks(self, key):
+        freq = self._signal_freq(key)
+        return (60*60*2*freq,)
+
+    def _make_timecols(self, signal):
+        chunks = self._signal_chunks(signal)
+        freq = self._signal_freq(signal)
+        lengths = [len(x) for x in self._dsets[signal]]
+        arrs = [da_date_idx(start, N, freq, chunks)
+                for start, N in zip(self._start_times, lengths)]
+        return da.stack(arrs, axis=0)
 
 class IdxToDate():
     def __init__(self, start, freq):
