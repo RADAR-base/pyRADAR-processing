@@ -252,7 +252,11 @@ class ParticipantData(RadarObject):
                 self._data[k] = modals[k]
 
     def _load(self, name, path, **kwargs):
-        self._data[name] = io.generic.load_data_path(path, **kwargs)
+        data = io.generic.load_data_path(path, **kwargs)
+        if isinstance(data, dict):
+            self._data.update(data)
+        else:
+            self._data[name] = data
 
     def save(self, outpath, outfmt, data_names=None, **kwargs):
         if data_names is None:

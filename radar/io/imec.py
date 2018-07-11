@@ -41,30 +41,30 @@ class Imec(object):
                 'other': self._make_timecols('Battery'),
                 }
         self.imec_acceleration = \
-                self._df_from_signals(['ACC-X', 'ACC-Y', 'ACC-Z'],
+                self._da_from_signals(['ACC-X', 'ACC-Y', 'ACC-Z'],
                                       ['x', 'y', 'z'],
                                       'accelerometer')
         self.imec_gsr = \
-                self._df_from_signals(['GSR-1', 'GSR-2'],
+                self._da_from_signals(['GSR-1', 'GSR-2'],
                                       ['GSR_1', 'GSR_2'],
                                       'electrode')
         self.imec_ecg = \
-            self._df_from_signals(['ECG'], ['ECG'], 'electrode')
+            self._da_from_signals(['ECG'], ['ECG'], 'electrode')
         self.imec_emg = \
-            self._df_from_signals(['EMG'], ['EMG'], 'electrode')
+            self._da_from_signals(['EMG'], ['EMG'], 'electrode')
         self.imec_battery = \
-            self._df_from_signals(['Battery'], ['battery'], 'other')
+            self._da_from_signals(['Battery'], ['battery'], 'other')
         self.imec_temperature = \
-            self._df_from_signals(['Temp'], ['temperature'], 'other')
+            self._da_from_signals(['Temp'], ['temperature'], 'other')
         self.imec_pie = \
-            self._df_from_signals(['PIE'], ['PIE'], 'other')
+            self._da_from_signals(['PIE'], ['PIE'], 'other')
 
-    def _df_from_signals(self, signals, names, timecol):
+    def _da_from_signals(self, signals, names, timecol):
         arrs = [self._signals[sig] for sig in signals]
         catarr = da.concatenate(arrs, axis=1)
-        df = dd.from_dask_array(catarr, columns=names)
+        # df = dd.from_dask_array(catarr, columns=names)
         # df['time'] = dd.from_dask_array(self._timecols[timecol])
-        return df
+        return catarr
 
     def _signal_freq(self, key):
         h5 = self._h5s[0]
