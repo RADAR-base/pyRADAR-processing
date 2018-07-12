@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-from . import io
-from .common import abs_path, log
 from .generic import AttrRecDict
+from .common import abs_path, log
+from .io.generic import search_project_dir, search_dir_for_data, load_data_path
 
 class RadarObject():
     _parent = None
@@ -117,10 +117,10 @@ class Project(RadarObject):
 
     def _parse_path(self, path, subprojects=None, participants=None,
                     blacklist=None, **kwargs):
-        dir_dict = io.generic.get_project_dir(path,
-                                              subprojects=subprojects,
-                                              participants=participants,
-                                              blacklist=blacklist)
+        dir_dict = search_project_dir(path,
+                                      subprojects=subprojects,
+                                      participants=participants,
+                                      blacklist=blacklist)
         return dir_dict
 
     def _add_subprojects(self, paths, **kwargs):
@@ -245,14 +245,20 @@ class ParticipantData(RadarObject):
         for path in paths:
             self._search_path(path, **kwargs)
 
+    def __repr__(self):
+        topics = list(self._data.keys())
+        topics.sort()
+        return 'Participant data topics:\n {}'\
+                .format(', '.join(topics) if topics else 'None')
+
     def _search_path(self, path, replace=False, **kwargs):
-        modals = io.generic.search_dir_for_data(path, **kwargs)
+        modals = search_dir_for_data(path, **kwargs)
         for k, v in modals.items():
             if replace or (k not in self._data):
                 self._data[k] = modals[k]
 
     def _load(self, name, path, **kwargs):
-        data = io.generic.load_data_path(path, **kwargs)
+        data = load_data_path(path, **kwargs)
         if isinstance(data, dict):
             self._data.update(data)
         else:
