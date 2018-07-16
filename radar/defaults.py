@@ -14,8 +14,14 @@ class Config(dict):
 config = Config()
 config.schema = Config()
 config.schema.device = 'android'
+config.schema.key = None
+config.schema.dir = None
+config.specifications = Config()
+config.specifications.dir = None
 config.io = Config()
 config.io.index = 'value.time'
+config.log = Config()
+config.log.to_file = None
 
 
 """
@@ -26,13 +32,3 @@ _FILTER = tables.Filters(complib='zlib', complevel=4, shuffle=True)
 _PACKAGE_DIR = '/' + os.path.join('', *__file__.split(os.path.sep)[:-2])
 _SPECIFICATION_DIR = os.path.join(_PACKAGE_DIR, 'radar_schemas',
                                   'specifications')
-_SCHEMA_DIR = os.path.join(_PACKAGE_DIR, 'radar_schemas', 'commons')
-_SCHEMA_KEY_FILE = None
-_DEVICE = 'android_'
-
-# Default time columns
-TIME_COLS = ('value.time', 'value.timeReceived')
-
-# Logging
-FILE_LOGGING = False
-"""
