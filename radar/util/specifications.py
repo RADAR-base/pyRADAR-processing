@@ -3,15 +3,15 @@ import glob
 import os
 import yaml
 from collections import OrderedDict
-from ..defaults import _SPECIFICATION_DIR
 from ..common import RecursiveDict
 
 
 class ProjectSpecs(OrderedDict):
     """
-    A class to hold all YML specifications relating to a RADAR project
+    A dictionary class to hold all YML specifications relating to a
+    RADAR project
     """
-    def __init__(self, spec_dir: str = _SPECIFICATION_DIR):
+    def __init__(self, spec_dir: str):
         """
         A path (str) to a RADAR specification directory should be given to
         initialise the class. It will use the package default specifications if
@@ -39,7 +39,7 @@ class ProjectSpecs(OrderedDict):
 
 class DeviceSpec(OrderedDict):
     """
-    A class to store RADAR YML specifications
+    A dictionary class to store RADAR YML specifications
     """
     def __init__(self, specification_file: str):
         with open(specification_file) as f:
@@ -60,7 +60,7 @@ class DeviceSpec(OrderedDict):
 
 class ModalitySpec(OrderedDict):
     """
-    A class to store the modalities of a RADAR specification.
+    A dictionary class to store the modalities of a RADAR specification.
     """
 
     def __init__(self, modal:dict):

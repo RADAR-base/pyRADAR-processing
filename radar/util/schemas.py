@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
+import os
+import json
+import glob
+import requests
 import numpy as np
-import glob, os, json
-from ..defaults import _SCHEMA_DIR, _SCHEMA_KEY_FILE, _DEVICE
-from ..common import logger
+import pandas as pd
+from ..common import log
+from ..defaults import config
 
 AVRO_NP_TYPES = {
     'null': 'object',
@@ -16,55 +20,32 @@ AVRO_NP_TYPES = {
     'enum': 'object',
 }
 
-class ProjectSchemas(dict):
-    def __init__(self, schema_dir=_SCHEMA_DIR, key_schema=_SCHEMA_KEY_FILE):
-        if key_schema is not None:
-            with open(key_schema, 'r') as f:
-                key_schema = f.read()
-
-        avsc_files = glob.glob(schema_dir + '/**/*.avsc', recursive=True)
-        for schema_path in avsc_files:
-            rel_path = os.path.relpath(schema_path, schema_dir)
-            split_rel_path = rel_path.split(os.path.sep)
-            if split_rel_path[0] not in ('active', 'passive'):
-                continue
-            name = ''.join((_DEVICE if split_rel_path[0] == 'passive' else '',
-                            split_rel_path[-1]))[:-5]
-            with open(schema_path, 'r') as f:
-                value_json = f.read()
-                obj = RadarSchema(value_json=value_json, key_json=key_schema)
-                self[name] = obj
-
-
 class RadarSchema():
     """
     A class for use with RADAR-base key-value pair schemas. Initialise with a
     json string representation of the schema.
     """
 
-    def __init__(self, schema_json=None, key_json=None, value_json=None):
+    def __init__(self, schema_json=None, key_json=None):
         """
-        This class is initiated with a json string representation of a
+        This class is initiated with a json dict representation of a
         RADAR-base schema.
         Parameters
         __________
-        schema_json: string (json)
-            A json string representation of a key-value pair RADAR-base schema
-        key_json: string (json)
-            A json string representation of a key RADAR-base schema
-        value_json: string (json)
-            A json string representation of a value RADAR-base schema
+        schema_json: dict (json)
+            A json dict representation of a key-value pair RADAR-base schema
+            May also only represent the value section of the schema.
+        key_json: dict (json)
+            A json dict representation of a key RADAR-base schema
         __________
         Either schema_json or value_json must be specified. key_json may also
         be given alongside value_json.
         """
-        if schema_json:
-            self.schema = json.loads(schema_json)
-        elif value_json:
+        if value_json:
             if key_json is None:
-                key_json = '{"namespace": "NoKey", "fields": []}'
+                key_json = {"namespace": "NoKey", "fields": []}
             self.schema = combine_key_value_schemas(key_json, value_json)
-        else:
+        elif not schema_json:
             raise ValueError('Please provide json representation of a'
                              'key-value schema or a value schema with or'
                              'without a seperate key schema.')
@@ -104,63 +85,97 @@ class RadarSchema():
         def get_type(col, *args):
             typeval = col['type']
             typeval_type = type(typeval)
-            if typeval_type is str:
-                return typeval
-            elif typeval_type is list:
-                return typeval[1] if typeval[0] is 'null' else typeval[0]
+            if typeval_type is list:
+                typeval = (t for t in typeval if not t == 'null')
+                return next(typeval)
             else:
-                # Should check for enum/other complex types as well
-                return typeval['type']
+                return typeval
         return self.get_col_info(func=get_type)
 
-    def get_col_numpy_types(self):
+    def get_col_py_types(self):
         """
         Returns an array of the equivilent numpy datatypes for the csv file for
         the schema
         """
-        def convert_type(data_type):
+        def convert_type(dtype):
             # numpy arrays don't want union types.
-            if isinstance(data_type, list):
-                dtype = [convert_type(x) for x in data_type if x != 'null']
-                if len(dtype) == 1:
-                    return dtype[0]
+            if isinstance(dtype, list):
+                nptype = dtype[0] if len(dtype) == 1 else np.object
+            elif isinstance(dtype, dict):
+                if dtype['type'] == 'enum':
+                    nptype = pd.api.types.CategoricalDtype(dtype['symbols'])
                 else:
-                    return np.object
+                    nptype = np.object
             else:
-                return AVRO_NP_TYPES[data_type]
+                nptype = AVRO_NP_TYPES[dtype]
+            return nptype
         return [convert_type(x) for x in self.get_col_types()]
 
     def dtype(self):
         return {k:v for k,v in zip(self.get_col_names(),
-                                   self.get_col_numpy_types())}
+                                   self.get_col_py_types())}
 
 
-def combine_key_value_schemas(key_schema, value_schema):
+def schema_from_value_or_schema(schema_json, key_json=None):
+    if schema_json['doc'] == 'combined key-value record':
+        schema = schema_json
+    else:
+        key_json = key_json if key_json is not None else
+        schema = combine_key_value_schemas(key_json, schema_json)
+    return schema
+
+def combine_key_value_schemas(key_json, value_json):
     """ Combined a RADAR key schema and a RADAR value schema.
     Needs cleaning
     Parameters
     __________
-    key_schema: string (json)
-        The json string representation of a RADAR key schema. By default
+    key_schema: dict
+        The json dict representation of a RADAR key schema. By default
         observation_key
-    value_schema: string (json)
-        The json string representation of a RADAR value schema.
+    value_json: dict
+        The json dict representation of a RADAR value schema.
     """
-    key_dict = json.loads(key_schema)
-    value_dict = json.loads(value_schema)
-    schema_dict = {
+    schema_json = {
             'type': 'record',
-            'name': value_dict['name'],
-            'namespace' : '{}_{}'.format(key_dict['namespace'],
-                                         value_dict['namespace']),
+            'name': value_json['name'],
+            'namespace' : '{}_{}'.format(key_json['namespace'],
+                                         value_json['namespace']),
             'doc': 'combined key-value record',
             'fields': [
                     {'name': 'key',
-                     'type': key_dict,
+                     'type': key_json,
                      'doc': 'Key of a Kafka SinkRecord'},
                     {'name': 'value',
-                     'type': value_dict,
+                     'type': value_json,
                      'doc': 'Value of a Kafka SinkRecord'},
                 ],
             }
-    return schema_dict
+    return schema_json
+
+def schemas_from_commons(path, key_path=None):
+    schema_paths = glob.glob(path + '/**/*.avsc', recursive=True)
+    schemas = []
+    names = []
+    for sp in schema_paths:
+        if os.path.relpath(sp).split(os.path.sep)[0] in ('kafka',):
+                    continue
+        name = os.path.basename(sp).split('.')[0]
+        if 'passive' in sp:
+            name = config.schema.device + '_' + name
+        names.append(name)
+        with open(sp) as vf:
+            value_json = json.loads(vf.read())
+            if key_path:
+                with open(key_path) as kf:
+                    key_json = json.loads(kf.read())
+                    scm = RadarSchema(key_json=key_json, value_json=value_json)
+            else:
+                scm = RadarSchema(value_json=value_json)
+        schemas.append(scm)
+    return {name: scm for name, scm in zip(names, schemas)}
+
+def schemas_from_git(path, key=None):
+    pass
+
+def schema_from_url(value_url, key_url=None):
+    pass
