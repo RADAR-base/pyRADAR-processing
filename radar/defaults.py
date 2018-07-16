@@ -12,8 +12,10 @@ class Config(dict):
         self[key] = val
 
 config = Config()
-config['schema'] = Config()
-config['schema']['device'] = 'android'
+config.schema = Config()
+config.schema.device = 'android'
+config.io = Config()
+config.io.index = 'value.time'
 
 
 """

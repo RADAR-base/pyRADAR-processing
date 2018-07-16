@@ -20,36 +20,28 @@ AVRO_NP_TYPES = {
     'enum': 'object',
 }
 
+BLANK_KEY = {"namespace": "NoKey", "fields": []}
+
 class RadarSchema():
     """
     A class for use with RADAR-base key-value pair schemas. Initialise with a
     json string representation of the schema.
     """
 
-    def __init__(self, schema_json=None, key_json=None):
+    def __init__(self, schema_json, key_json=None):
         """
         This class is initiated with a json dict representation of a
         RADAR-base schema.
         Parameters
         __________
-        schema_json: dict (json)
+        schema_json: dict
             A json dict representation of a key-value pair RADAR-base schema
             May also only represent the value section of the schema.
-        key_json: dict (json)
+        key_json: dict (optional)
             A json dict representation of a key RADAR-base schema
         __________
-        Either schema_json or value_json must be specified. key_json may also
-        be given alongside value_json.
         """
-        if value_json:
-            if key_json is None:
-                key_json = {"namespace": "NoKey", "fields": []}
-            self.schema = combine_key_value_schemas(key_json, value_json)
-        elif not schema_json:
-            raise ValueError('Please provide json representation of a'
-                             'key-value schema or a value schema with or'
-                             'without a seperate key schema.')
-
+        self.schema = schema_from_value_or_schema(schema_json, key_json)
 
     def get_col_info(self, func=lambda x:x, *args):
         """
@@ -65,7 +57,7 @@ class RadarSchema():
         supplied for nested values.
         """
         def get_info_rec(col, par, *keys):
-            return col.props[keys[0]] if len(keys) == 1 else \
+            return col[keys[0]] if len(keys) == 1 else \
                    get_info_rec(col.props[keys[0]], par, *keys[1:])
         return self.get_col_info(get_info_rec, *keys)
 
@@ -90,7 +82,7 @@ class RadarSchema():
                 return next(typeval)
             else:
                 return typeval
-        return self.get_col_info(func=get_type)
+        return self.get_col_info_by_key('type')
 
     def get_col_py_types(self):
         """
@@ -100,7 +92,13 @@ class RadarSchema():
         def convert_type(dtype):
             # numpy arrays don't want union types.
             if isinstance(dtype, list):
-                nptype = dtype[0] if len(dtype) == 1 else np.object
+                if 'null' in dtype:
+                    dtype.remove('null')
+                    if len(dtype) == 1 and dtype[0] in ('float', 'double',
+                                                        'int', 'long'):
+                        nptype = AVRO_NP_TYPES[dtype[0]]
+                    else:
+                        nptype = np.object
             elif isinstance(dtype, dict):
                 if dtype['type'] == 'enum':
                     nptype = pd.api.types.CategoricalDtype(dtype['symbols'])
@@ -115,12 +113,22 @@ class RadarSchema():
         return {k:v for k,v in zip(self.get_col_names(),
                                    self.get_col_py_types())}
 
+    def timecols(self):
+        return [name for name, doc in zip(self.get_col_names(),
+                                          self.get_col_info_by_key('doc'))
+                if 'timestamp' in doc]
+
+    def timedeltas(self):
+        return [name for name, doc in zip(self.get_col_names(),
+                                          self.get_col_info_by_key('doc'))
+                if 'duration' in doc]
 
 def schema_from_value_or_schema(schema_json, key_json=None):
     if schema_json['doc'] == 'combined key-value record':
         schema = schema_json
     else:
-        key_json = key_json if key_json is not None else
+        if key_json is None:
+            key_json = BLANK_KEY
         schema = combine_key_value_schemas(key_json, schema_json)
     return schema
 
@@ -165,13 +173,12 @@ def schemas_from_commons(path, key_path=None):
         names.append(name)
         with open(sp) as vf:
             value_json = json.loads(vf.read())
-            if key_path:
-                with open(key_path) as kf:
-                    key_json = json.loads(kf.read())
-                    scm = RadarSchema(key_json=key_json, value_json=value_json)
-            else:
-                scm = RadarSchema(value_json=value_json)
-        schemas.append(scm)
+        if key_path:
+            with open(key_path) as kf:
+                key_json = json.loads(kf.read())
+        else:
+            key_json = None
+        schemas.append(RadarSchema(value_json, key_json=key_json))
     return {name: scm for name, scm in zip(names, schemas)}
 
 def schemas_from_git(path, key=None):
