@@ -6,7 +6,7 @@ import requests
 import numpy as np
 import pandas as pd
 from ..common import log
-from ..defaults import config
+from ..defaults import config, schemas
 
 AVRO_NP_TYPES = {
     'null': 'object',
@@ -105,7 +105,7 @@ class RadarSchema():
                 else:
                     nptype = np.object
             else:
-                nptype = AVRO_NP_TYPES[dtype]
+                nptype = AVRO_NP_TYPES.get(dtype, np.object)
             return nptype
         return [convert_type(x) for x in self.get_col_types()]
 
@@ -164,25 +164,34 @@ def schemas_from_commons(path, key_path=None):
     schema_paths = glob.glob(path + '/**/*.avsc', recursive=True)
     schemas = []
     names = []
+    whitelist = ('passive', 'connector', 'monitor')
     for sp in schema_paths:
-        if os.path.relpath(sp).split(os.path.sep)[0] in ('kafka',):
-                    continue
+        if os.path.relpath(sp, path).split(os.path.sep)[0] not in whitelist:
+            continue
         name = os.path.basename(sp).split('.')[0]
         if 'passive' in sp:
             name = config.schema.device + '_' + name
         names.append(name)
-        with open(sp) as vf:
-            value_json = json.loads(vf.read())
-        if key_path:
-            with open(key_path) as kf:
-                key_json = json.loads(kf.read())
-        else:
-            key_json = None
-        schemas.append(RadarSchema(value_json, key_json=key_json))
+        schemas.append(schema_from_file(sp, key_path))
     return {name: scm for name, scm in zip(names, schemas)}
+
+def schema_from_file(path, key_path=None):
+    with open(path) as vf:
+        scm_json = json.loads(vf.read())
+    if key_path:
+        with open(key_path) as kf:
+            key_json = json.loads(kf.read())
+    else:
+        key_json = None
+    return RadarSchema(scm_json, key_json=key_json)
+
 
 def schemas_from_git(path, key=None):
     pass
 
 def schema_from_url(value_url, key_url=None):
     pass
+
+
+if config.schema.dir:
+    schemas.update(schemas_from_commons(config.schema.dir, config.schema.key))

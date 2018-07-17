@@ -96,3 +96,8 @@ class AttrRecDict(RecursiveDict):
         string[0] = 'Attribute recursive dict with'
         string = '\n'.join(string)
         return string
+
+class AttrDict(dict):
+    def __init__(self, *args, **kwargs):
+        super(AttrDict, self).__init__(*args, **kwargs)
+        self.__dict__ = self

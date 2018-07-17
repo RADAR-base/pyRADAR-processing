@@ -120,32 +120,32 @@ def get_data_func(name, ext, compression, isfile):
     if ext == 'csv':
         if compression:
             func = lambda path, *args, **kwargs: \
-                    dd.read_csv(path.rstrip('/') + '/' + '*.csv.*',
+                    dd.read_csv(path + '/*.csv.*',
                                 compression=compression, blocksize=None,
                                 *args, **kwargs)
         else:
             func = lambda path, *args, **kwargs: \
-                    dd.read_csv(path.rstrip('/') + '/' + '*.csv',
+                    dd.read_csv(path + '/*.csv',
                                 *args, **kwargs)
     elif ext == 'tsv':
         if compression:
             func = lambda path, *args, **kwargs: \
-                    dd.read_tsv(path.rstrip('/') + '/' + '*.tsv.*',
+                    dd.read_tsv(path + '/*.tsv.*',
                                 compression=compression, blocksize=None,
                                 *args, **kwargs)
         else:
             func = lambda path, *args, **kwargs: \
-                    dd.read_tsv(path.rstrip('/') + '/' + '.tsv',
+                    dd.read_tsv(path + '/*.tsv',
                                 *args, **kwargs)
     elif ext == 'json':
         if compression:
             func = lambda path, *args, **kwargs: \
-                    dd.read_json(path.rstrip('/') + '/' + '*.json.*',
+                    dd.read_json(path + '/*.json.*',
                                 compression=compression, blocksize=None,
                                 *args, **kwargs)
         else:
             func = lambda path, *args, **kwargs: \
-                    dd.read_json(path.rstrip('/') + '/' + '*.json',
+                    dd.read_json(path + '/*.json',
                                 *args, **kwargs)
     elif ext == 'parquet' or ext == 'pq':
         func = dd.read_parquet

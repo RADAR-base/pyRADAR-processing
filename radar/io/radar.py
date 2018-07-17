@@ -19,7 +19,7 @@ def read_csv(path, *args, **kwargs):
     df = dd.from_delayed(delayed_files, divisions=divisions)
     return df
 
-def _read_csv_func(dtype=None, timecols=None, index=None):
+def _read_csv_func(dtype=None, timecols=None, index=config.io.index):
     if dtype is None:
         dtype = {}
     if timecols is None:
@@ -44,7 +44,7 @@ def read_csv_schema(schema, *args, **kwargs):
         return df
     return delayed_read_csv
 
-def read_csv_funcs_from_schemas(schemas, *args, **kwargs):
+def schema_read_csv_funcs(schemas, *args, **kwargs):
     """
     Adds read_csv functions for each schema name to the _data_load_funcs
     in radar.io.generic
@@ -54,4 +54,9 @@ def read_csv_funcs_from_schemas(schemas, *args, **kwargs):
         Dictionary containing keys of schema names with RadarSchema values
     """
     for name, scm in schemas.items():
-        _data_load_funcs[name] = read_csv_schema(scm) 
+        print(name)
+        _data_load_funcs[name] = read_csv_schema(scm)
+
+if config.schema.read_csvs:
+    from ..util import schemas
+    schema_read_csv_funcs(schemas.schemas)
