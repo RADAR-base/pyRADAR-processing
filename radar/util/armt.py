@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from ..common import log
 
-DEF_COLS = ['key.projectId', 'key.userId', 'key.sourceId',
+_DEF_COLS = ['key.projectId', 'key.userId', 'key.sourceId',
             'value.time', 'value.timeCompleted', 'value.name',
             'value.version']
 
@@ -12,13 +12,21 @@ def iterrows(df):
     return (row[1] for row in df.iterrows())
 
 def melt(df):
-    id_vars = [c for c in df if 'value.answers' not in c]
-    melt = df.melt(id_vars=id_vars)
-    melt['variable'] = [v.split('.')[-1] for v in melt['variable']]
+    ids = [c for c in df if 'value.answers' not in c]
+    melt = df.melt(id_vars=ids)
+    melt['arrid'] = [(lambda x: x[-2])(x) for x
+            in melt['variable'].str.split('.')]
+    melt['field'] = [(lambda x: x[-1])(x) for x
+            in melt['variable'].str.split('.')]
+    col_data = [(x[0], x[1]['value'].values) for x in melt.groupby('field')]
+    melt = pd.DataFrame([x[1][ids].iloc[0] for x in melt.groupby('arrid')])
+    melt = melt.reset_index(drop=True)
+    for col, data in col_data:
+        melt[col] = data
     return melt
 
 def populate(df, definition, fields=None):
-    """ populates an aRMT dataframe with additional columns based
+    """ Populates a melted aRMT dataframe with additional columns based
     on the questionId
     Parameters
     __________
@@ -27,7 +35,9 @@ def populate(df, definition, fields=None):
     definition : list of dicts
         An aRMT definition loaded with json std lib.
     fields : dict
-        A dict with field names as keys and functions as values. The function should
+        A dict with field names as keys and functions as values. The function
+        should have the definition entry as first argument and the code/answer
+        value as the second argument.
 
     Returns
     ______
@@ -35,6 +45,7 @@ def populate(df, definition, fields=None):
         A DataFrame with the additional column fields.
 
     """
+
     def add_columns(row):
         """ Adds given columns to the row using the definition.
         Parameters
@@ -81,7 +92,6 @@ def branch_logic_is_true(row, branch_logic):
         Whether the branch logic evaluates to True or False.
         If branch_logic is an empty string, returns True.
     """
-
     def question_val(row, question_id):
         idx = next(c for c in row.index if row[c] == question_id).split('.')[2]
         return row['value.answers.{}.value'.format(idx)]
@@ -97,7 +107,7 @@ def branch_logic_is_true(row, branch_logic):
 def infer_questionId(df, definition):
     """ Parses through an aRMT dataframe and uses the definition
     to add questionId columns. Not recommended, espeically for ESM, because it
-    assumes that there are no missing answers (there shouldn't be, but there are)
+    assumes that there are no missing answers (shouldn't happen, but does)
 
     Parameters
     __________
@@ -135,7 +145,7 @@ def infer_questionId(df, definition):
             if branch_logic_is_true(row, branch_logic):
                 code = row['value.answers.{}.value'.format(i)]
                 key = 'value.answers.{}.questionId'.format(i)
-                if not out_row.get(key, False):
+                if np.isnan(out_row.get(key, np.nan)):
                     out_row[key] = func(entry, code)
                 i += 1
         return out_row
@@ -158,8 +168,13 @@ def code_label(entry, code):
         return np.nan
     return labels[0]
 
+def key_func(key):
+    def use_key(entry, *args, **kwargs):
+        return entry[key]
+    return use_key
+
 def arrange_cols(fields, n):
-    cols = DEF_COLS.copy()
+    cols = _DEF_COLS.copy()
     for i in range(n):
         cols.extend('value.answers.{}.{}'.format(i, f)
                     for f in sorted(fields))
@@ -167,11 +182,6 @@ def arrange_cols(fields, n):
                     for c in ('questionId', 'value', 'startTime', 'endTime')
                     if c not in fields)
     return cols
-
-def key_func(key):
-    def use_key(entry, *args, **kwargs):
-        return entry[key]
-    return use_key
 
 def defintion_entry_from_label(definition, label):
     for entry in definition:

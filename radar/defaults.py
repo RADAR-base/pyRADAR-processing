@@ -1,4 +1,5 @@
 import os
+import yaml
 schemas = {}
 specifications = {}
 protocols = {}
@@ -25,11 +26,12 @@ config = Config()
 config.aRMT = {}
 config.io = {}
 config.log = {}
+config.protocol = {}
 config.schema = {}
 config.specifications = {}
 config.schema.device = 'android'
 config.schema.key = None
-config.schema.dir = '/home/ubuntu/RADAR-Schemas/commons'
+config.schema.dir = None
 config.schema.git = False
 config.schema.github_owner = 'RADAR-base'
 config.schema.github_repo = 'RADAR-Schemas'
@@ -42,4 +44,21 @@ config.specifications.github_repo = 'RADAR-Schemas'
 config.specifications.github_sha = 'extended-specs'
 config.io.index = 'value.time'
 config.log.to_file = None
+config.protocol.url = ''
 
+
+import collections
+def update(d, u):
+    for k, v in u.items():
+        if isinstance(v, collections.Mapping):
+            d[k] = update(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
+
+with open(os.path.join(os.path.split(__file__)[0], 'config.yml')) as f:
+    update(config, yaml.load(f))
+
+if 'config.yml' in os.listdir():
+    with open('config.yml', 'r') as f:
+        update(config, yaml.load(f))

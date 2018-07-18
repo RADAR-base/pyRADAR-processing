@@ -4,6 +4,7 @@ import requests
 import numpy as np
 import pandas as pd
 from functools import lru_cache
+from ..defaults import config
 
 class Object(object):
     pass
@@ -169,10 +170,16 @@ class Protocol(object):
         return pd.DataFrame.from_items((('datetime',expected_times),
                                  ('questionnaires_completed', intervals)))
 
-def project_from_url(url):
+def from_url(url):
     r = requests.get(url)
     r.raise_for_status()
     protocols = json.loads(r.text)
     protocols = {p['name']: Protocol(p) for p in protocols['protocols']}
     return protocols
+
+if config.protocol.path:
+    with open(config.protocol.path, 'r') as f:
+        protocol = Protocol(json.load(f))
+if config.protocol.url:
+    protocol = from_url(config.protocol.url)
 

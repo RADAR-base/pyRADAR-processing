@@ -3,23 +3,34 @@ import glob
 import pandas as pd
 import dask.delayed as delayed
 import dask.dataframe as dd
+from functools import wraps
 from ..common import config
 from .generic import _data_load_funcs
+from ..util.armt import melt, populate, infer_questionId
 
-def read_csv(path, *args, **kwargs):
-    files = glob.glob(path + '/*.csv*')
-    files.sort()
-    dtype = kwargs.get('dtype', {})
-    timecols = kwargs.get('timecols', [])
-    index = kwargs.get('index', config.io.index)
-    divisions = [file_datehour(fn) for fn in files] +\
-                [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
-    delayed_files = [delayed(_read_csv_func(dtype=dtype, timecols=timecols,
-                                            index=index))(fn) for fn in files]
-    df = dd.from_delayed(delayed_files, divisions=divisions)
-    return df
+def delayed_read(func, *args, **kwargs):
+    def read(path):
+        df = func(path, *args, **kwargs)
+        return df
+    return read
 
-def _read_csv_func(dtype=None, timecols=None, index=config.io.index):
+def file_datehour(fn):
+    return pd.Timestamp(fn.split('/')[-1].split('.')[0].replace('_', 'T'))
+
+def read_csv_func(func):
+    @wraps(func)
+    def wrapper(path, *args, **kwargs):
+        files = glob.glob(path + '/*.csv*')
+        files.sort()
+        divisions = [file_datehour(fn) for fn in files] +\
+                    [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
+        delayed_files = [delayed(func(*args, **kwargs))(fn)
+                                 for fn in files]
+        return dd.from_delayed(delayed_files, divisions=divisions)
+    return wrapper
+
+@read_csv_func
+def read_prmt_csv(dtype=None, timecols=None, index=config.io.index):
     if dtype is None:
         dtype = {}
     if timecols is None:
@@ -33,16 +44,19 @@ def _read_csv_func(dtype=None, timecols=None, index=config.io.index):
         return df
     return read_csv
 
-def file_datehour(fn):
-    return pd.Timestamp(fn.split('/')[-1].split('.')[0].replace('_', 'T'))
-
-def read_csv_schema(schema, *args, **kwargs):
-    dtype = schema.dtype()
-    timecols = schema.timecols()
-    def delayed_read_csv(path):
-        df = read_csv(path, dtype=dtype, timecols=timecols, *args, **kwargs)
+@read_csv_func
+def read_armt_csv(index=config.io.index):
+    def read_csv(path, *args, **kwargs):
+        df = pd.read_csv(path, *args, **kwargs)
+        df = melt(df)
+        for col in ('value.time', 'value.timeCompleted',
+                    'startTime', 'endTime'):
+            df[col] = (1e9 * df[col].values).astype('datetime64[ns]')
+        df['arrid'] = df.index
+        df = df.set_index(index)
+        df = df.sort_index(kind='mergesort')
         return df
-    return delayed_read_csv
+    return read_csv
 
 def schema_read_csv_funcs(schemas, *args, **kwargs):
     """
@@ -54,9 +68,19 @@ def schema_read_csv_funcs(schemas, *args, **kwargs):
         Dictionary containing keys of schema names with RadarSchema values
     """
     for name, scm in schemas.items():
-        print(name)
-        _data_load_funcs[name] = read_csv_schema(scm)
+        _data_load_funcs[name] =\
+                delayed_read(read_prmt_csv, scm.dtype(), scm.timecols())
+
+def armt_read_csv_funcs(protocol):
+    for armt in protocol.values():
+        name = armt.questionnaire.avsc + '_' + armt.questionnaire.name
+        _data_load_funcs[name] = delayed_read(read_armt_csv)
+    pass
 
 if config.schema.read_csvs:
-    from ..util import schemas
-    schema_read_csv_funcs(schemas.schemas)
+    from ..util import schemas as _schemas
+    schema_read_csv_funcs(_schemas.schemas)
+
+if config.protocol.url or config.protocol.file:
+    from ..util import protocol as _protocol
+    armt_read_csv_funcs(_protocol.protocol)
