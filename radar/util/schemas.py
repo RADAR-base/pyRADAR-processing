@@ -91,19 +91,15 @@ class RadarSchema():
         """
         def convert_type(dtype):
             # numpy arrays don't want union types.
+            nptype = np.object
             if isinstance(dtype, list):
                 if 'null' in dtype:
                     dtype.remove('null')
-                    if len(dtype) == 1 and dtype[0] in ('float', 'double',
-                                                        'int', 'long'):
-                        nptype = AVRO_NP_TYPES[dtype[0]]
-                    else:
-                        nptype = np.object
-            elif isinstance(dtype, dict):
-                if dtype['type'] == 'enum':
-                    nptype = pd.api.types.CategoricalDtype(dtype['symbols'])
-                else:
-                    nptype = np.object
+                if len(dtype) == 1 and dtype[0] in ('float', 'double',
+                                                    'int', 'long'):
+                    nptype = AVRO_NP_TYPES[dtype[0]]
+            elif isinstance(dtype, dict) and dtype['type'] == 'enum':
+                nptype = pd.api.types.CategoricalDtype(dtype['symbols'])
             else:
                 nptype = AVRO_NP_TYPES.get(dtype, np.object)
             return nptype
