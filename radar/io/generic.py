@@ -78,7 +78,7 @@ def infer_data_format(f, include='.*', exclude='.*schema.json'):
         return [ext, comp]
 
     fs = get_fs(**infer_storage_options(f))
-    name = f.split(fs.sep)[0]
+    name = f.split(fs.sep)[-1]
     isfile = fs.isfile(f)
     if isfile:
         ext, comp = infer_file_format(f)
@@ -109,8 +109,11 @@ _data_load_funcs = {}
 def get_data_func(name, ext, compression, isfile):
     ext_comp = (ext, compression)
     if name in _data_load_funcs:
+        print('name {} in data_load_funcs'.format(name))
         return _data_load_funcs[name]
     elif ext_comp in _data_load_funcs:
+        print('name {} not in data_load_funcs'.format(name))
+        print('ext_comp {}, {} in data_load_funcs'.format(*ext_comp))
         return _data_load_funcs[ext_comp]
 
     if name == 'IMEC':
@@ -155,6 +158,7 @@ def get_data_func(name, ext, compression, isfile):
         log.error('Unsupported data format "{}" or compression "{}"'\
                   .format(ext, compression))
         func = lambda *args, **kwargs: None
+    print('name {} not in data_load_funcs'.format(name))
     _data_load_funcs[ext_comp] = func
     return func
 

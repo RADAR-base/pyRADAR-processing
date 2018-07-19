@@ -181,20 +181,20 @@ class Participant(RadarObject):
         self.name = name if name is not None \
                          else paths[0].split('/')[-1]
         self._parent = kwargs.get('parent', None)
-        self.info = kwargs.get('info', {}) 
+        self.info = kwargs.get('info', {})
         self.labels = kwargs.get('labels', {})
         self.data = ParticipantData(self, **kwargs.get('datakw', {}))
         self._paths = []
         paths = [paths] if type(paths) == 'str' else\
                 [] if paths is None else paths
-        for p in paths:
+        for p in self._norm_paths(paths):
             self.add_path(p, **kwargs.get('datakw', {}))
 
     def __repr__(self):
         return "Participant {}. of type {}".format(self.name, type(self))
 
     def add_path(self, path, **kwargs):
-        self._paths.append(self._norm_paths(path))
+        self._paths.append(path)
         self.data._search_path(path, **kwargs)
 
     def reparse_data(self, **datakw):
