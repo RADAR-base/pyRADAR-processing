@@ -3,6 +3,10 @@ from .generic import AttrRecDict
 from .common import abs_path, log
 from .io.generic import search_project_dir, search_dir_for_data, load_data_path
 
+class PtcDict(AttrRecDict):
+    def __repr__(self):
+        return 'Participants:\n\t' + '\n\t'.join(self._get_keys())
+
 class RadarObject():
     _parent = None
     def _get_attr_or_parents(self, attr):
@@ -27,7 +31,7 @@ class RadarObject():
         parent = self._parent
         if parent is None:
             return '/'
-        path = '/' + self.name
+        path = '/' + (self.name if hasattr(self, name) else '')
         while parent._parent is not None:
             path = '/' + parent.name + path
             parent = parent._parent
@@ -54,7 +58,7 @@ class RadarObject():
 class Project(RadarObject):
     """
     """
-    def __init__(self, name='', parent=None, paths=None,
+    def __init__(self, name='', path='', parent=None, paths=None,
                  schemas=None, specifications=None,
                  armt_definitions=None, armt_protocols=None, **kwargs):
         self.name = name
@@ -66,7 +70,9 @@ class Project(RadarObject):
         self.armt_protocols = armt_protocols
         self.subprojects = AttrRecDict()
         self.participants = self._parent.participants[self.name] if \
-                self._parent else AttrRecDict()
+                self._parent else PtcDict()
+        if path:
+            self.add_path(*self._norm_paths(path))
         for path in self._norm_paths(paths):
             self.add_path(path, **kwargs)
 
@@ -110,7 +116,7 @@ class Project(RadarObject):
                       'used as a participant in project {}'.format(proj.name))
             return None
         else:
-            proj.participants[name] = AttrRecDict()
+            proj.participants[name] = PtcDict()
             proj.subprojects[name] = Project(name=name, parent=self,
                                              *args, **kwargs)
         return proj.subprojects[name]

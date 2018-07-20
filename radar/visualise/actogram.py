@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 import matplotlib.pyplot as plt
+import pandas as pd
 
-def plot(dataframe, datacol='value.x'):
-    groups = dataframe.groupby([dataframe.index.year, dataframe.index.month,
-                                dataframe.index.day])
+week = pd.Timedelta('7d')
+def plot(dataframe, datacol='value.x', **kwargs):
+    groups = dataframe.groupby([dataframe.index.year, # dataframe.index.month,
+                                dataframe.index.week])
     n = len(groups)
-    fig, axes = plt.subplots(len(groups), 1, sharey=True, figsize=(8, n*0.15))
+    fig, axes = plt.subplots(n, 1, sharey=True, figsize=(8, 2*n))
     for i, group in enumerate(groups):
-        group[1].plot(y=datacol, ax=axes[i], color='k', kind='area',
-                      yticks=[], sharex=True)
-        plt.subplots_adjust(hspace=0)
-        axes[i].legend_.remove()
-    mticks = axes[n-1].get_xaxis().get_majorticklabels()
-    mticks[1].set_text('00:00')
-    mticks[2].set_text('00:00')
+        ax = axes[i] if str(type(axes)) == "<class 'numpy.ndarray'>" else axes
+        start = pd.Timestamp(str(group[0][0])) + pd.Timedelta((group[0][1]-1)*7, 'd')
+        end = start + week
+        group[1].plot(y=datacol, ax=ax, **kwargs)
+        ax.set_xlim(start, end)
+        if ax.legend_:
+            ax.legend_.remove()
+    # mticks = axes[n-1].get_xaxis().get_majorticklabels()
+    # mticks[1].set_text('00:00')
+    # mticks[2].set_text('00:00')
+    plt.subplots_adjust(hspace=0.5)
+    fig.tight_layout()
     return fig
