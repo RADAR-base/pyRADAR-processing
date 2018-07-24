@@ -32,10 +32,10 @@ def daily_plot(dataframe, datacol, **kwargs):
         end = start + day
         group[1].plot(y=datacol, ax=ax, **kwargs)
         ax.set_xlim(start, end)
+        ax.xticks([], []
         if hasattr(ax, 'legend_') and ax.legend_:
             ax.legend_.remove()
     plt.subplots_adjust(hspace=0)
     plt.tick_params(axis='both', which='both', bottom=False, top=False,
             labelbottom=False, right=False, left=False, labelleft=False)
-    fig.tight_layout()
     return fig
