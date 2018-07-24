@@ -25,14 +25,18 @@ def daily_plot(dataframe, datacol, **kwargs):
     groups = dataframe.groupby([dataframe.index.year, dataframe.index.month,
                                 dataframe.index.day])
     n = len(groups)
-    fig, axes = plt.subplots(n, 1, sharey=True, figsize=(8, 2*n))
+    fig, axes = plt.subplots(n, 1, sharey=True, figsize=(3, 0.15*n))
     for i, group in enumerate(groups):
         ax = axes[i] if str(type(axes)) == "<class 'numpy.ndarray'>" else axes
         start = pd.Timestamp(group[1].index[0].date())
         end = start + day
-        group[1].plot(y=datacol, ax=ax, **kwargs)
+        group[1].plot(y=datacol, ax=ax, legend=False, **kwargs)
         ax.set_xlim(start, end)
-        ax.xticks([], [])
+        plt.yticks([], [])
+        plt.xticks([], [])
+        plt.xlabel('')
+        plt.ylabel('')
+        plt.axis('off')
         if hasattr(ax, 'legend_') and ax.legend_:
             ax.legend_.remove()
     plt.subplots_adjust(hspace=0)
