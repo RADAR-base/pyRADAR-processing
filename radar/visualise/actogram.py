@@ -32,7 +32,7 @@ def daily_plot(dataframe, datacol, **kwargs):
         end = start + day
         group[1].plot(y=datacol, ax=ax, **kwargs)
         ax.set_xlim(start, end)
-        ax.xticks([], []
+        ax.xticks([], [])
         if hasattr(ax, 'legend_') and ax.legend_:
             ax.legend_.remove()
     plt.subplots_adjust(hspace=0)
