@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import re
+import numpy as np
+import pandas as pd
 import dask.dataframe as dd
 from collections import Counter
 from dask.bytes.utils import infer_compression, infer_storage_options
@@ -12,7 +14,9 @@ def out_paths(path, sep, files, *args, **kwargs):
             whitelist = files
         if blacklist is None:
             blacklist = []
-        return [f for f in files if f in whitelist and f not in blacklist]
+        return [f for f in files if f in whitelist and
+                                    f not in blacklist and
+                                    f[0] != '.']
     files = f_cond(files, *args, **kwargs)
     return [path.rstrip(sep) + sep + f for f in files]
 
@@ -78,6 +82,7 @@ def infer_data_format(f, include='.*', exclude='.*schema.json'):
         return [ext, comp]
 
     fs = get_fs(**infer_storage_options(f))
+    f = f.rstrip(fs.sep)
     name = f.split(fs.sep)[-1]
     isfile = fs.isfile(f)
     if isfile:
@@ -86,19 +91,35 @@ def infer_data_format(f, include='.*', exclude='.*schema.json'):
         ext, comp = infer_folder_format(f, include, exclude)
     return [name, ext, comp, isfile]
 
-def search_dir_for_data(path, whitelist=None, blacklist=None,
-                        include=None, exclude=None, **kwargs):
+
+COMBI_DATA = {'IMEC': ('imec_acceleration', 'imec_gsr',
+                       'imec_ecg', 'imec_emg',
+                       'imec_temperature', 'imec_pie')}
+
+def search_dir_for_data(path, **kwargs):
     subdirs = kwargs.pop('subdirs', [])
-    blacklist = blacklist + subdirs if blacklist is not None else None
+    blacklist = kwargs.pop('blacklist', [])
+    if isinstance(subdirs, str):
+        subdirs = [subdirs]
+    blacklist = blacklist + subdirs
     fs = get_fs(**infer_storage_options(path))
-    paths = listdir(path, whitelist=whitelist, blacklist=blacklist,
-                    include=include, exclude=exclude)
+    paths = listdir(path, blacklist=blacklist,
+                    whitelist=kwargs.get('whitelist', None),
+                    include=kwargs.get('include', None),
+                    exclude = kwargs.get('exclude', None))
     for sd in subdirs:
         subpath = path.rstrip(fs.sep) + fs.sep + sd
         if fs.isdir(subpath):
             paths.extend(listdir(subpath, **kwargs))
-    return {p.split(fs.sep)[-1]: p for p in paths}
-
+    out = {}
+    for p in paths:
+        name = p.split(fs.sep)[-1]
+        if name in COMBI_DATA:
+            for n in COMBI_DATA[name]:
+                out[n] = p
+        else:
+            out[name] = p
+    return out
 
 # Data loading
 def load_data_path(path, **kwargs):
@@ -107,6 +128,7 @@ def load_data_path(path, **kwargs):
 
 _data_load_funcs = {}
 def get_data_func(name, ext, compression, isfile):
+    func = None
     ext_comp = (ext, compression)
     if name in _data_load_funcs:
         return _data_load_funcs[name]
@@ -151,10 +173,65 @@ def get_data_func(name, ext, compression, isfile):
         func = dd.read_parquet
     elif ext == 'orc':
         func = dd.read_orc
-    else:
+    if func is None:
         log.error('Unsupported data format "{}" or compression "{}"'\
                   .format(ext, compression))
         func = lambda *args, **kwargs: None
     _data_load_funcs[ext_comp] = func
     return func
 
+
+idx_error = ('only integers, slices (`:`), ellipsis (`...`),',
+             ' and integer or boolean arrays are valid indices')
+class FakeDatetimeArray(object):
+    def __init__(self, start, length, freq=None, step=None):
+        """
+        step : int
+            step size in seconds (1/freq)
+
+        negative slices don't work
+        """
+        if step is None and freq is None:
+            raise ValueError('Must provide either freq or step')
+        if step:
+            self.step = int(1e9) * step
+            self.freq = 1/step
+        else:
+            self.freq = freq
+            self.step = int(1e9 / self.freq)
+        self.start = pd.Timestamp(start, 'ns').asm8.astype('int64')
+        self.length = length
+        self.shape = (length,)
+        self.dtype = np.dtype('datetime64[ns]')
+
+    def __getitem__(self, x):
+        if isinstance(x, tuple):
+            x = x[0]
+        arr = None
+        if isinstance(x, slice):
+            start = 0 if x.start is None else x.start
+            stop = self.length if x.stop is None else x.stop
+            step = 1 if x.step is None else x.step
+            arr = np.array(range(start, stop, step))
+        if isinstance(x, list):
+            if isinstance(x[0], bool) and self.length == len(x):
+                arr = np.where(x)
+            if isinstance(x[0], int):
+                arr = np.array(x)
+        elif isinstance(x, np.ndarray):
+            if x.dtype == 'bool':
+                arr = np.where(x)
+            else:
+                arr = x
+        elif isinstance(x, int):
+            arr = np.array(x)
+        elif x == Ellipsis:
+            arr = np.array(range(self.length))
+        if arr is None:
+            raise IndexError(idx_error)
+        arr = arr[arr >= 0]
+        arr = arr[arr < self.length]
+        return (self.start + (arr * self.step)).astype('datetime64[ns]')
+
+    def __len__(self):
+        return self.length

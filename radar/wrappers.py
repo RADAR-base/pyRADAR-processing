@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
+from . import config
 from .generic import AttrRecDict
 from .common import abs_path, log
 from .io.generic import search_project_dir, search_dir_for_data, load_data_path
+from .io.core import get_fs
+from dask.bytes.utils import infer_storage_options
 
 class PtcDict(AttrRecDict):
     def __repr__(self):
@@ -31,7 +34,7 @@ class RadarObject():
         parent = self._parent
         if parent is None:
             return '/'
-        path = '/' + (self.name if hasattr(self, name) else '')
+        path = '/' + (self.name if hasattr(self, 'name') else '')
         while parent._parent is not None:
             path = '/' + parent.name + path
             parent = parent._parent
@@ -94,7 +97,7 @@ class Project(RadarObject):
         for ptc in self.participants:
             ptc.save_all(output=output)
             """
-        pass
+        raise NotImplementedError()
 
     def add_participant(self, name, where='.', *args, **kwargs):
         proj = self if where == '.' else self.subprojects[where]
@@ -138,15 +141,20 @@ class Project(RadarObject):
     def _add_participants(self, paths, **kwargs):
         for p in paths:
             name = p.split('/')[-1]
-            ptc = self.add_participant(name, **kwargs)
-            ptc.add_path(p, **kwargs.get('datakw', {}))
+            if name in self.participants:
+                ptc.add_path(p, **kwargs.get('datakw', {}))
+            else:
+                ptc = self.add_participant(name, paths=p, **kwargs)
 
     def add_path(self, path, **kwargs):
         self._paths.append(path)
         dir_dict = self._parse_path(path, **kwargs)
         self._add_subprojects(dir_dict['subprojects'])
-        self._add_participants(dir_dict['participants'],
-                               **kwargs.get('ptckw', {}))
+        ptckw = kwargs.get('ptckw', {})
+        ptckw.update(config.project.ptckw)
+        datakw = kwargs.get('datakw', {})
+        datakw.update(config.project.datakw)
+        self._add_participants(dir_dict['participants'], datakw=datakw, **ptckw)
 
     def __repr__(self):
         return 'RADAR {} of type {}: {}, {} participants'\
@@ -180,21 +188,20 @@ class Participant(RadarObject):
     RADAR trial. Typically intialised by opening a Project.
     """
     def __init__(self, name=None, paths=None, info=None, **kwargs):
-        if not (name or folder or 'paths' in kwargs):
+        if not (name or paths):
             raise ValueError(('You must specify a name or else provide'
                               'a path (or paths) to the participant'))
-
         self.name = name if name is not None \
                          else paths[0].split('/')[-1]
         self._parent = kwargs.get('parent', None)
         self.info = kwargs.get('info', {})
         self.labels = kwargs.get('labels', {})
-        self.data = ParticipantData(self, **kwargs.get('datakw', {}))
+        datakw = kwargs.get('datakw', {})
+        datakw.update(config.project.datakw)
+        self.data = ParticipantData(self, **datakw)
         self._paths = []
-        paths = [paths] if type(paths) == 'str' else\
-                [] if paths is None else paths
         for p in self._norm_paths(paths):
-            self.add_path(p, **kwargs.get('datakw', {}))
+            self.add_path(p, **datakw)
 
     def __repr__(self):
         return "Participant {}. of type {}".format(self.name, type(self))
@@ -204,6 +211,8 @@ class Participant(RadarObject):
         self.data._search_path(path, **kwargs)
 
     def reparse_data(self, **datakw):
+        datakw = kwargs.get('datakw', {})
+        datakw.update(config.project.datakw)
         self.data = ParticipantData(self, paths=self._paths, **datakw)
 
     def export_data(self, data=None, names=None, project_path=None,

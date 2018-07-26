@@ -29,6 +29,7 @@ config.log = {}
 config.protocol = {}
 config.schema = {}
 config.specifications = {}
+config.project = {}
 config.schema.device = 'android'
 config.schema.key = None
 config.schema.dir = None
@@ -45,6 +46,8 @@ config.specifications.github_sha = 'extended-specs'
 config.io.index = 'value.time'
 config.log.to_file = None
 config.protocol.url = ''
+config.project.ptckw = {}
+config.project.datakw = {}
 
 
 import collections

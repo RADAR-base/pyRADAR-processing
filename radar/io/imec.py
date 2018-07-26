@@ -1,105 +1,103 @@
 #!/usr/bin/env python3
 import h5py
+import numpy as np
 import pandas as pd
 import dask.array as da
 import dask.dataframe as dd
 from dask.bytes.utils import infer_storage_options
 from .core import get_fs
+from .generic import FakeDatetimeArray
 
-class Imec(object):
+class Imec(dict):
     def __init__(self, path):
         fs = get_fs(**infer_storage_options(path))
-        self._h5s = [h5py.File(h5) for h5 in
-                     fs.glob(path + fs.sep + '*' + fs.sep + '*.h5')]
-        self._start_times = []
-        for h5 in self._h5s:
-            start_time = h5['/Devices/Radar'].attrs.get('#DateTime')
-            if start_time is None:
-                raise ValueError(('The given IMEC h5 file does not have '
-                                  'a date/time attribute. Please ensure it '
-                                  'was converted correctly'))
+        if fs.isfile(path):
+            h5_paths = [path]
+        else:
+            h5_paths = fs.glob(path + fs.sep + '*.h5')
+
+        h5s = [h5py.File(p) for p in h5_paths]
+        start_times = [h5['/Devices/Radar/'].attrs.get('#DateTime')
+                       for h5 in h5s]
+        for i, st in enumerate(start_times):
+            if st is None:
+                raise ValueError(('The IMEC file "{}" does not have a date/time '
+                                  'attribute. Please ensure it was converted'
+                                  'properly'.format(h5_paths[i])))
             else:
-                self._start_times.append(
-                        pd.Timestamp(bytes.decode(start_time)))
+                start_times[i] = st.decode()
 
-        self._dsets = {
-                k: [h5['/Devices/Radar/Signal/{}/Data'.format(k)]
-                    for h5 in self._h5s]
-                for k in self._h5s[0]['/Devices/Radar/Signal/']
-                }
-
+        self._h5s = h5s
+        self._start_times = start_times
+        self._dsets = {k: [h5['/Devices/Radar/Signal/{}/Data'.format(k)]
+                           for h5 in self._h5s]
+                       for k in self._h5s[0]['/Devices/Radar/Signal/']}
         self._signals = {
-                k: da.stack(
-                    [da.from_array(dset, chunks=self._signal_chunks(k))
-                        for dset in self._dsets[k]], axis=0).transpose()
-                    for k, v in self._dsets.items()
-                }
+            k: da.concatenate(
+                [da.from_array(dset, chunks=self._signal_chunks(k))
+                 for dset in self._dsets[k]],
+                axis=0)
+            for k in self._dsets}
 
-        self._timecols = {
-                'accelerometer':self._make_timecols('ACC-X'),
-                'electrode' : self._make_timecols('ECG'),
-                'other': self._make_timecols('Battery'),
-                }
-        self.imec_acceleration = \
-                self._da_from_signals(['ACC-X', 'ACC-Y', 'ACC-Z'],
-                                      ['x', 'y', 'z'],
-                                      'accelerometer')
-        self.imec_gsr = \
-                self._da_from_signals(['GSR-1', 'GSR-2'],
-                                      ['GSR_1', 'GSR_2'],
-                                      'electrode')
-        self.imec_ecg = \
-            self._da_from_signals(['ECG'], ['ECG'], 'electrode')
-        self.imec_emg = \
-            self._da_from_signals(['EMG'], ['EMG'], 'electrode')
-        self.imec_battery = \
-            self._da_from_signals(['Battery'], ['battery'], 'other')
-        self.imec_temperature = \
-            self._da_from_signals(['Temp'], ['temperature'], 'other')
-        self.imec_pie = \
-            self._da_from_signals(['PIE'], ['PIE'], 'other')
+        self._timecols = {signal: self._make_timecol(signal)
+                          for signal in ('ECG', 'ACC-X', 'Temp')}
 
-    def _da_from_signals(self, signals, names, timecol):
-        arrs = [self._signals[sig] for sig in signals]
-        catarr = da.concatenate(arrs, axis=1)
-        # df = dd.from_dask_array(catarr, columns=names)
-        # df['time'] = dd.from_dask_array(self._timecols[timecol])
-        return catarr
+        self['imec_acceleration'] =\
+                self._da_from_signals(('ACC-X', 'ACC-Y', 'ACC-Z'),
+                                      ('x', 'y', 'z'),
+                                      self._timecols['ACC-X'])
+        self['imec_gsr'] =\
+                self._da_from_signals(('GSR-1', 'GSR-2'),
+                                      ('GSR_1', 'GSR_2'),
+                                      self._timecols['ECG'])
+        self['imec_ecg'] =\
+                self._da_from_signals(('ECG',),
+                                      ('ECG',),
+                                      self._timecols['ECG'])
+        self['imec_emg'] =\
+                self._da_from_signals(('EMG',),
+                                      ('EMG',),
+                                      self._timecols['ECG'])
+        self['imec_temperature'] =\
+                self._da_from_signals(('Temp',),
+                                      ('temp',),
+                                      self._timecols['Temp'])
+        self['imec_pie'] =\
+                self._da_from_signals(('PIE',),
+                                      ('PIE',),
+                                      self._timecols['Temp'])
+
+    def _signal_chunks(self, key):
+        freq = self._signal_freq(key)
+        return int(60*60*freq)
 
     def _signal_freq(self, key):
         h5 = self._h5s[0]
         return float(h5['/Devices/Radar/Signal/{}'.format(key)].attrs['#Freq'])
 
-    def _signal_chunks(self, key):
-        freq = self._signal_freq(key)
-        return (60*60*2*freq,)
-
-    def _make_timecols(self, signal):
-        chunks = self._signal_chunks(signal)
+    def _make_timecol(self, signal):
         freq = self._signal_freq(signal)
         lengths = [len(x) for x in self._dsets[signal]]
-        arrs = [da_date_idx(start, N, freq, chunks)
-                for start, N in zip(self._start_times, lengths)]
-        return da.stack(arrs, axis=0)
+        chunks = self._signal_chunks(signal)
+        clen = 0
+        arrs = []
+        divs = []
+        for i in range(len(lengths)):
+            N = lengths[i]
+            start = self._start_times[i]
+            arr = FakeDatetimeArray(start, N, freq)
+            arrs.append(da.from_array(arr, chunks=chunks))
+            chunk_array = np.zeros(1 + len(arrs[i].chunks[0]))
+            chunk_array[1:] = np.cumsum(arrs[i].chunks[0])
+            divs.extend(arr[chunk_array])
+        divs.append(arr[len(arr) - 1])
+        return {'timecol': da.concatenate(arrs, axis=0),
+                'divs': divs}
 
-class IdxToDate():
-    def __init__(self, start, freq):
-        self.start = pd.Timestamp(start, 'ns').asm8.astype('int64')
-        self.freq = freq
-    def __call__(self, x):
-        return (self.start + (int(1e9 / self.freq) * x)).astype('M8[ns]')
-
-
-class DateToIdx():
-    def __init__(self, start, freq):
-        self.start = pd.Timestamp(start, 'ns').asm8.astype('int64')
-        self.freq = freq
-
-    def __call__(self, date):
-        date = pd.Timestamp(date, 'ns').asm8.astype('int64')
-        idx = (((date - self.start) / 1e9) * self.freq)
-        return int(round(idx))
-
-def da_date_idx(start, N, freq, chunks):
-    return da.fromfunction(IdxToDate(start, freq), shape=(N,),
-                           chunks=chunks, dtype='M8[ns]')
+    def _da_from_signals(self, signals, names, timecol):
+        arrs = [self._signals[sig] for sig in signals]
+        catarr = da.stack(arrs, axis=1)
+        df = dd.from_dask_array(catarr, columns=names)
+        df['time'] = dd.from_dask_array(timecol['timecol'])
+        df = df.set_index('time', sorted=True, divisions=timecol['divs'])
+        return df
