@@ -61,9 +61,37 @@ class RadarObject():
 class Project(RadarObject):
     """
     """
-    def __init__(self, name='', path='', parent=None, paths=None,
+    def __init__(self, name='', paths=None, parent=None,
                  schemas=None, specifications=None,
                  armt_definitions=None, armt_protocols=None, **kwargs):
+        """
+        Parameters
+        __________
+        name : str
+            The name of the project
+        paths : list / str
+            Path(s) containing project data
+        parent : radar.Project / None
+            A radar.Project instance if the project is a subproject, else None
+        subprojects : list
+            A list of subprojects to load in paths
+        participants : list
+            A list of participants to load in paths
+        blacklist : list
+            Files/folders to ignore in paths
+        ptckw : dict
+            Participant keywords
+        datakw : dict
+            Keywords for participant's data loading
+        schemas : None
+            --
+        specifications : None
+            --
+        armt_definitions : None
+            --
+        armt_protocols : None
+            --
+        """
         self.name = name
         self._parent = parent
         self._paths = []
@@ -74,8 +102,6 @@ class Project(RadarObject):
         self.subprojects = AttrRecDict()
         self.participants = self._parent.participants[self.name] if \
                 self._parent else PtcDict()
-        if path:
-            self.add_path(*self._norm_paths(path))
         for path in self._norm_paths(paths):
             self.add_path(path, **kwargs)
 
@@ -86,18 +112,6 @@ class Project(RadarObject):
             return getattr(self.participants, key)
         else:
             raise KeyError('No such subproject or participant: {}'.format(key))
-
-    def save_project(self, output=None, *args, **kwargs):
-        """OLD
-        if output is None:
-            output = self._get_attr_or_parents('output')
-        for sp in self.subprojects:
-            output.create_subproject(name=sp.name, where=self._get_path())
-            sp.save_project(output=output, *args, **kwargs)
-        for ptc in self.participants:
-            ptc.save_all(output=output)
-            """
-        raise NotImplementedError()
 
     def add_participant(self, name, where='.', *args, **kwargs):
         proj = self if where == '.' else self.subprojects[where]
@@ -182,12 +196,37 @@ class Project(RadarObject):
             return func(ptc, *args, **kwargs)
         return map(ptc_func, list(self.participants))
 
+    def _ptc_update_dict(self, new_dict, dictname):
+        for ptc in self.participants:
+            old_dict = getattr(ptc, dictname)
+            old_dict.update(new_dict.get(ptc.name, {}))
+
+    def ptcs_update_labels(self, labels):
+        self._ptc_update_dict(labels, 'labels')
+
+    def ptcs_update_info(self, info):
+        self._ptc_update_dict(info, 'info')
+
 
 class Participant(RadarObject):
     """ A class to hold data and methods concerning participants/subjects in a
     RADAR trial. Typically intialised by opening a Project.
     """
-    def __init__(self, name=None, paths=None, info=None, **kwargs):
+    def __init__(self, name=None, paths=None, **kwargs):
+        """
+        Parameters
+        __________
+        name : str
+
+        paths : str or list
+
+        info : dict (optional)
+
+        labels : dict (optional)
+
+        datakw : dict (optional)
+            Keywords for participant's data loading
+        """
         if not (name or paths):
             raise ValueError(('You must specify a name or else provide'
                               'a path (or paths) to the participant'))

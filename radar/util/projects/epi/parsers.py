@@ -18,7 +18,7 @@ class RedcapCsv():
         self.df = pd.read_csv(csv_path)
         self.tz = timezone
 
-    def seizure_times(self):
+    def seizures(self):
         """
         Returns
         _______
@@ -39,12 +39,32 @@ class RedcapCsv():
         labels = {}
         for i in range(1, max(self.df.record_id) + 1):
             ptc = df[df.record_id == i]
-            ptc_code = ptc.patient_code.iloc[0]
+            code = ptc.patient_code.iloc[0]
             seizures = ptc.iloc[1:]
-            labels[ptc_code] = {}
-            labels[ptc_code]['Seizure'] = \
+            labels[code] = {}
+            labels[code]['Seizure'] = \
                     seizures[['start', 'end']].reset_index(drop=True)
         return labels
 
-    def ptc_info(self):
-        pass
+    def info(self):
+        """
+        Returns
+        _______
+        info : dict
+            A dict where each key is a patient code with another dict as
+            a value. That dict has keys corresponding to patient information
+            fields - enrolment date, recording start, and recording end
+        """
+        info = {}
+        for i in range(1, max(self.df.record_id) + 1):
+            ptc = self.df[self.df.record_id == i]
+            code = ptc.patient_code.iloc[0]
+            enrolled = ptc.enrolment_date.iloc[0]
+            recording_start = ptc.start_date.iloc[0]
+            recording_end = ptc.recording_end_date.iloc[0]
+            info[code] = {}
+            info[code]['enrolled'] = pd.to_datetime(enrolled)
+            info[code]['recording_start'] = pd.to_datetime(recording_start)
+            info[code]['recording_end'] = pd.to_datetime(recording_end)
+        return info
+
