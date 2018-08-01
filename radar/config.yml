@@ -1,6 +1,8 @@
 schema:
     dir: '/home/ubuntu/RADAR-Schemas/commons'
+    key_cols: ['projectId', 'userId', 'sourceId']
     read_csvs: True
+
 
 specifications:
     dir: '/home/ubuntu/RADAR-Schemas/specifications'

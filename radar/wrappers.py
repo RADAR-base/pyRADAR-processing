@@ -81,6 +81,8 @@ class Project(RadarObject):
             Participant keywords
         datakw : dict
             Keywords for participant's data loading
+        info : dict
+            dict of dicts (key = participant name, inner dict = participant info)
         schemas : None
             --
         specifications : None
@@ -102,6 +104,10 @@ class Project(RadarObject):
                 self._parent else PtcDict()
         for path in self._norm_paths(paths):
             self.add_path(path, **kwargs)
+
+        info = kwargs.get('info', False)
+        if info:
+            self.ptcs_update_info(info)
 
     def __getitem__(self, key):
         if key in self.subprojects:

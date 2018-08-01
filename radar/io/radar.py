@@ -4,8 +4,8 @@ import pandas as pd
 import dask.delayed as delayed
 import dask.dataframe as dd
 from functools import wraps
-from ..common import config
 from .generic import _data_load_funcs
+from ..common import config
 from ..util.armt import melt, populate, infer_questionId
 
 def delayed_read(func, *args, **kwargs):

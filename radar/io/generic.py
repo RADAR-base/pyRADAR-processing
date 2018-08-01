@@ -3,6 +3,7 @@ import re
 import numpy as np
 import pandas as pd
 import dask.dataframe as dd
+from functools import lru_cache
 from collections import Counter
 from dask.bytes.utils import infer_compression, infer_storage_options
 from ..common import log
@@ -50,8 +51,11 @@ def search_project_dir(path, subprojects=None, participants=None,
 
 
 # Data searching
+@lru_cache(8)
+def re_compile(pattern):
+    return re.compile(pattern)
 
-def infer_data_format(f, include='.*', exclude='.*schema.json'):
+def infer_data_format(f, include='.*', exclude='.*schema.*json'):
     def infer_file_format(f):
         comp = infer_compression(f)
         i = 2 if comp else 1
@@ -59,16 +63,16 @@ def infer_data_format(f, include='.*', exclude='.*schema.json'):
         ext = file_split[-i]
         return [ext, comp]
 
-    def infer_folder_format(path, include=None, exclude='.*schema.json'):
+    def infer_folder_format(path, include=None, exclude='.*schema.*json'):
         fs = get_fs(**infer_storage_options(path))
         folder_split = path.split(fs.sep)[-1].split('.')
         if len(folder_split) > 1:
             return [folder_split[-1], None]
 
         if include is not None:
-            include = re.compile(include)
+            include = re_compile(include)
         if exclude is not None:
-            exclude = re.compile(exclude)
+            exclude = re_compile(exclude)
         exts_comps = list(zip(*(infer_file_format(x) for x in fs.list_files(path)
                                if (include is None or include.match(x))
                                and (exclude is None or not exclude.match(x)))))
