@@ -61,9 +61,7 @@ class RadarObject():
 class Project(RadarObject):
     """
     """
-    def __init__(self, name='', paths=None, parent=None,
-                 schemas=None, specifications=None,
-                 armt_definitions=None, armt_protocols=None, **kwargs):
+    def __init__(self, name='', paths=None, parent=None, **kwargs):
         """
         Parameters
         __________
@@ -95,10 +93,10 @@ class Project(RadarObject):
         self.name = name
         self._parent = parent
         self._paths = []
-        self.schemas = schemas
-        self.specifications = specifications
-        self.armt_definitions = armt_definitions
-        self.armt_protocols = armt_protocols
+        # self.schemas = schemas
+        # self.specifications = specifications
+        # self.armt_definitions = armt_definitions
+        # self.armt_protocols = armt_protocols
         self.subprojects = AttrRecDict()
         self.participants = self._parent.participants[self.name] if \
                 self._parent else PtcDict()
@@ -150,7 +148,7 @@ class Project(RadarObject):
         for p in paths:
             name = p.split('/')[-1]
             sp = self.add_subproject(name, **kwargs)
-            sp.add_path(p)
+            sp.add_path(p, **kwargs)
 
     def _add_participants(self, paths, **kwargs):
         for p in paths:
@@ -163,7 +161,7 @@ class Project(RadarObject):
     def add_path(self, path, **kwargs):
         self._paths.append(path)
         dir_dict = self._parse_path(path, **kwargs)
-        self._add_subprojects(dir_dict['subprojects'])
+        self._add_subprojects(dir_dict['subprojects'], **kwargs)
         ptckw = kwargs.get('ptckw', {})
         ptckw.update(config.project.ptckw)
         datakw = kwargs.get('datakw', {})
@@ -250,7 +248,6 @@ class Participant(RadarObject):
         self.data._search_path(path, **kwargs)
 
     def reparse_data(self, **datakw):
-        datakw = kwargs.get('datakw', {})
         datakw.update(config.project.datakw)
         self.data = ParticipantData(self, paths=self._paths, **datakw)
 

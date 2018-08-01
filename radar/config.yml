@@ -1,2 +1,9 @@
-test:
-    test: 1
+schema:
+    dir: '/home/ubuntu/RADAR-Schemas/commons'
+    read_csvs: True
+
+specifications:
+    dir: '/home/ubuntu/RADAR-Schemas/specifications'
+
+protocol:
+    url: 'https://raw.githubusercontent.com/RADAR-base/RADAR-aRMT-protocols/master/RADAR-MDD-KCL-s1/protocol.json'
