@@ -12,18 +12,28 @@ def iterrows(df):
     return (row[1] for row in df.iterrows())
 
 def melt(df):
+    """
+    Melts a questionnaire CSV into same number of columns
+    Needs cleaning up
+    """
+    df = df.drop_duplicates()
     ids = [c for c in df if 'value.answers' not in c]
-    melt = df.melt(id_vars=ids)
-    melt['arrid'] = [(lambda x: x[-2])(x) for x
-            in melt['variable'].str.split('.')]
-    melt['field'] = [(lambda x: x[-1])(x) for x
-            in melt['variable'].str.split('.')]
-    col_data = [(x[0], x[1]['value'].values) for x in melt.groupby('field')]
-    melt = pd.DataFrame([x[1][ids].iloc[0] for x in melt.groupby('arrid')])
-    melt = melt.reset_index(drop=True)
-    for col, data in col_data:
-        melt[col] = data
-    return melt
+    def melt_row(row, ids):
+        melt = row.melt(id_vars=ids)
+        melt['arrid'] = [(lambda x: x[-2])(x) for x
+                in melt['variable'].str.split('.')]
+        melt['field'] = [(lambda x: x[-1])(x) for x
+                in melt['variable'].str.split('.')]
+        col_data = [(x[0], x[1]['value'].values) for x in melt.groupby('field')]
+        melt = pd.DataFrame([x[1][ids].iloc[0] for x in melt.groupby('arrid')])
+        melt = melt.reset_index(drop=True)
+        for col, data in col_data:
+            melt[col] = data
+        return melt
+    out = pd.concat(melt_row(df[i:i+1], ids) for i in range(len(df)))
+    out['startTime'] = out.startTime.astype('float')
+    out['endTime'] = out.endTime.astype('float')
+    return out
 
 def populate(df, definition, fields=None):
     """ Populates a melted aRMT dataframe with additional columns based
