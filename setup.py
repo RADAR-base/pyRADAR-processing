@@ -15,6 +15,7 @@ setup(name='radarstudy',
           'matplotlib',
           'bokeh',
           'dask',
+          'requests',
       ],
       include_package_data=True
 )
