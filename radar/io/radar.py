@@ -83,4 +83,4 @@ if config.schema.read_csvs:
 
 if config.protocol.url or config.protocol.file:
     from ..util import protocol as _protocol
-    armt_read_csv_funcs(_protocol.protocol)
+    armt_read_csv_funcs(_protocol.protocols)

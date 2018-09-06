@@ -4,7 +4,7 @@ import requests
 import numpy as np
 import pandas as pd
 from functools import lru_cache
-from ..defaults import config
+from ..defaults import config, protocols
 
 class Object(object):
     pass
@@ -121,7 +121,6 @@ class Protocol(object):
                     self.questionnaire_timedeltas() + \
                     offset
             timedeltas = timedeltas.append(deltas)
-        timedeltas.index = range(repeats - (0 if initial else 1))
         return timedeltas[timedeltas < time_delta]
 
     def questionnaires_between_times(self, start_time, end_time,
@@ -177,9 +176,14 @@ def from_url(url):
     protocols = {p['name']: Protocol(p) for p in protocols['protocols']}
     return protocols
 
+def from_path(path):
+    with open(path, 'r') as f:
+        protocols_file = json.load(f)
+    protocols = {p['name']: Protocol(p) for p in protocols['protocols']}
+    return protocols
+
 if config.protocol.path:
-    with open(config.protocol.path, 'r') as f:
-        protocol = Protocol(json.load(f))
-if config.protocol.url:
-    protocol = from_url(config.protocol.url)
+    protocols.update(from_path(config.protocol.path))
+elif config.protocol.url:
+    protocols.update(from_url(config.protocol.url))
 
