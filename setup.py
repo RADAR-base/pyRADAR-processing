@@ -12,10 +12,11 @@ setup(name='radarstudy',
           'numpy',
           'scipy',
           'pandas',
+          'dask[complete]',
+          'requests',
           'matplotlib',
           'bokeh',
-          'dask',
-          'requests',
+          'yml'
       ],
       include_package_data=True
 )
