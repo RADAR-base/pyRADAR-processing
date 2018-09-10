@@ -47,14 +47,16 @@ def read_prmt_csv(dtype=None, timecols=None, index=config.io.index):
 @read_csv_func
 def read_armt_csv(index=config.io.index):
     def read_csv(path, *args, **kwargs):
-        df = pd.read_csv(path, *args, **kwargs)
+        df = pd.read_csv(path, dtype=object, *args, **kwargs)
         df = melt(df)
         for col in ('value.time', 'value.timeCompleted',
                     'startTime', 'endTime'):
-            df[col] = (1e9 * df[col].values).astype('datetime64[ns]')
+            df[col] = (1e9 * df[col].astype('float')).astype('datetime64[ns]')
         df['arrid'] = df.index
         df = df.set_index(index)
         df = df.sort_index(kind='mergesort')
+        if 'questionId' not in df:
+            df['questionId'] = ''
         return df
     return read_csv
 

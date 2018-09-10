@@ -121,7 +121,7 @@ class Protocol(object):
                     self.questionnaire_timedeltas() + \
                     offset
             timedeltas = timedeltas.append(deltas)
-        return timedeltas[timedeltas < time_delta]
+        return pd.TimedeltaIndex(timedeltas[timedeltas < time_delta])
 
     def questionnaires_between_times(self, start_time, end_time,
                                      initial=True, offset='0'):
@@ -131,22 +131,22 @@ class Protocol(object):
         deltas = self.expected_questionnaires(time_delta=time_delta,
                                               initial=initial, offset=offset)
         times = start_time + deltas
+        if start_time.tzinfo is not None:
+            times = times.tz_localize(start_time.tzinfo.zone)
         return times
 
-    def adherence(self, df, start_time, end_time, timecol='index', **kwargs):
+    def adherence(self, df, start_time, end_time, **kwargs):
         """ Calculates adherence for a given aRMT dataframe
         Parameters
         _________
         df : pd.DataFrame
-            A dataframe with a datetime index or column (set by timecol)
+            A dataframe with a datetime index
             corresponding to questionnaire submission times.
         start_time : pd.Timestamp
             The start of the time frame of interest.
             Anything that pandas can convert to a Timestamp.
         end_time : pd.Timestamp
             The end of the time frame of interest.
-        timecol : str (optional)
-            The column to take the datetime value from (default: 'index')
         initial : bool (optional)
             Whether the questionnaires start at time-zero or after the first
             repeat period. (default: True)
@@ -156,18 +156,16 @@ class Protocol(object):
             Anything that pandas can convert to a Timedelta
         """
         def interval_sum(completed, expected, starti, endi):
-            return sum(np.logical_and((completed > expected.iloc[starti]),
-                                      (completed < expected.iloc[endi])))
+            return sum(np.logical_and((completed > expected[starti]),
+                                      (completed < expected[endi])))
         expected_times = self.questionnaires_between_times(start_time,
                                                            end_time, **kwargs)
-        completed_times = getattr(df, timecol)
-        if isinstance(completed_times, pd.Index):
-            completed_times = completed_times.to_series()
-        exp_end = expected_times.append(pd.Series(end_time))
+        completed_times = df.index
+        exp_end = expected_times.append(pd.DatetimeIndex([end_time]))
         intervals = [interval_sum(completed_times, exp_end, i, i+1)
                      for i in range(len(expected_times))]
-        return pd.DataFrame.from_items((('datetime',expected_times),
-                                 ('questionnaires_completed', intervals)))
+        return pd.DataFrame(data={'datetime': expected_times,
+                                  'questionnaires_completed': intervals})
 
 def from_url(url):
     r = requests.get(url)

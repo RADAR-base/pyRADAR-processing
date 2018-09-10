@@ -14,7 +14,7 @@ class Imec(dict):
         if fs.isfile(path):
             h5_paths = [path]
         else:
-            h5_paths = fs.glob(path + fs.sep + '*/*.h5')
+            h5_paths = fs.glob(path + fs.sep + '*.h5')
 
         h5s = [h5py.File(p) for p in h5_paths]
         start_times = [h5['/Devices/Radar/'].attrs.get('#DateTime')
