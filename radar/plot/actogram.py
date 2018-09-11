@@ -32,10 +32,10 @@ def daily_plot(dataframe, datacol, **kwargs):
         end = start + day
         group[1].plot(y=datacol, ax=ax, legend=False, **kwargs)
         ax.set_xlim(start, end)
-        plt.yticks([], [])
-        plt.xticks([], [])
-        plt.xlabel('')
-        plt.ylabel('')
+        ax.set_yticks([])
+        ax.set_xticks([])
+        ax.set_xlabel('')
+        ax.set_ylabel('')
         plt.axis('off')
         if hasattr(ax, 'legend_') and ax.legend_:
             ax.legend_.remove()

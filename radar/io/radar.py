@@ -35,6 +35,8 @@ def read_prmt_csv(dtype=None, timecols=None, index=config.io.index):
         dtype = {}
     if timecols is None:
         timecols = []
+    dtype['key.projectId'] = object
+
     def read_csv(path, *args, **kwargs):
         df = pd.read_csv(path, *args, dtype=dtype, **kwargs)
         for col in timecols:
