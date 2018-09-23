@@ -16,7 +16,7 @@ class Imec(dict):
         else:
             h5_paths = fs.glob(path + fs.sep + '*.h5')
 
-        h5s = [h5py.File(p) for p in h5_paths]
+        h5s = [h5py.File(p, mode='r') for p in h5_paths]
         start_times = [h5['/Devices/Radar/'].attrs.get('#DateTime')
                        for h5 in h5s]
         for i, st in enumerate(start_times):
