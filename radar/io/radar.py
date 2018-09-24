@@ -53,9 +53,8 @@ def read_armt_csv(index=config.io.index):
         df = melt(df)
         for col in ('value.time', 'value.timeCompleted',
                     'startTime', 'endTime'):
-            df[col] = pd.DatetimeIndex(1e9 * df[col].values).tz_localize('UTC')
-            # df[col] = (1e9 * df[col].astype('float')).astype('datetime64[ns]')
-            # df[col] = df[col].tz_localize('UTC')
+            df[col] = pd.DatetimeIndex(1e9 * df[col].values.astype('float'))\
+                                        .tz_localize('UTC')
         df['arrid'] = df.index
         df = df.set_index(index)
         df = df.sort_index(kind='mergesort')
