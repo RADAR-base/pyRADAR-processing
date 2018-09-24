@@ -15,7 +15,7 @@ def delayed_read(func, *args, **kwargs):
     return read
 
 def file_datehour(fn):
-    return pd.Timestamp(fn.split('/')[-1][0:13].replace('_', 'T'))
+    return pd.Timestamp(fn.split('/')[-1][0:13].replace('_', 'T')).tz_localize('UTC')
 
 def read_csv_func(func):
     @wraps(func)
