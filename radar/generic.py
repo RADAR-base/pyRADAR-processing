@@ -1,3 +1,5 @@
+import collections
+
 class RecursiveDict(dict):
     """ A dictionary that can directly access items from nested dictionaries
     using the '/' character.
@@ -101,3 +103,12 @@ class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
+
+
+def update(d, u):
+    for k, v in u.items():
+        if isinstance(v, collections.Mapping):
+            d[k] = update(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
