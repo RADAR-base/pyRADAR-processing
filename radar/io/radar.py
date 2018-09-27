@@ -8,6 +8,8 @@ from .generic import _data_load_funcs
 from ..common import config
 from ..util.armt import melt, populate, infer_questionId
 
+DT_MULT = int(1e9)
+
 def delayed_read(func, *args, **kwargs):
     def read(path):
         df = func(path, *args, **kwargs)
@@ -46,8 +48,10 @@ def read_prmt_csv(dtype=None, timecols=None,
     def read_csv(path, *args, **kwargs):
         df = pd.read_csv(path, *args, dtype=dtype, **kwargs)
         for col in timecols:
-            if df[col].dtype == 'int64':
-                df[col] = pd.DatetimeIndex(1e9 * df[col].values).tz_localize('UTC')
+            if df[col].dtype == 'int' or df[col].dtype == 'float':
+                df[col] = pd.DatetimeIndex((DT_MULT * df[col].values)\
+                            .astype('int64'))\
+                        .tz_localize('UTC')
             else:
                 df[col] = pd.to_datetime(df[col])
         for col, deltaunit in timedeltas.items():
