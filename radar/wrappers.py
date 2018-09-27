@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from . import config
-from .generic import AttrRecDict
+from .generic import AttrRecDict, update
 from .common import abs_path, log
 from .io.generic import search_project_dir, search_dir_for_data, load_data_path
 from .io.core import get_fs
@@ -82,7 +82,9 @@ class Project(RadarObject):
         datakw : dict
             Keywords for participant's data loading
         info : dict
-            dict of dicts (key = participant name, inner dict = participant info)
+            dict of dicts (key = participant id, inner dict = participant info)
+        labels : dict
+            dict of dicts (key = participant id, inner dict = participant labels)
         schemas : None
             --
         specifications : None
@@ -107,9 +109,18 @@ class Project(RadarObject):
 
         info = kwargs.get('info', False)
         if info:
-            for ptc in [p for p in info if p not in self.participants]:
-                self.add_participant(ptc)
+            for ptc in info:
+                if ptc not in self.participants:
+                    self.add_participant(ptc)
             self.ptcs_update_info(info)
+
+        labels = kwargs.get('labels', False)
+        if info:
+            for ptc in labels:
+                if ptc not in self.participants:
+                    self.add_participant(ptc)
+                self.ptcs_update_labels(labels)
+
 
     def __getitem__(self, key):
         if key in self.subprojects:
@@ -205,7 +216,7 @@ class Project(RadarObject):
     def _ptc_update_dict(self, new_dict, dictname):
         for ptc in self.participants:
             old_dict = getattr(ptc, dictname)
-            old_dict.update(new_dict.get(ptc.name, {}))
+            update(old_dict, new_dict.get(ptc.name, {}))
 
     def ptcs_update_labels(self, labels):
         self._ptc_update_dict(labels, 'labels')

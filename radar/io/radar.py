@@ -22,27 +22,39 @@ def read_csv_func(func):
     def wrapper(path, *args, **kwargs):
         files = glob.glob(path + '/*.csv*')
         files.sort()
-        divisions = [file_datehour(fn) for fn in files] +\
-                    [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
+        try: # temp
+            divisions = [file_datehour(fn) for fn in files] +\
+                        [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
+        except:
+            divisions = None
         delayed_files = [delayed(func(*args, **kwargs))(fn)
                                  for fn in files]
         return dd.from_delayed(delayed_files, divisions=divisions)
     return wrapper
 
 @read_csv_func
-def read_prmt_csv(dtype=None, timecols=None, index=config.io.index):
+def read_prmt_csv(dtype=None, timecols=None,
+                  timedeltas=None, index=config.io.index):
     if dtype is None:
         dtype = {}
     if timecols is None:
         timecols = []
+    if timedeltas is None:
+        timedeltas = {}
     dtype['key.projectId'] = object
 
     def read_csv(path, *args, **kwargs):
         df = pd.read_csv(path, *args, dtype=dtype, **kwargs)
         for col in timecols:
-            df[col] = pd.DatetimeIndex(1e9 * df[col].values).tz_localize('UTC')
+            if df[col].dtype == 'int64':
+                df[col] = pd.DatetimeIndex(1e9 * df[col].values).tz_localize('UTC')
+            else:
+                df[col] = pd.to_datetime(df[col])
+        for col, deltaunit in timedeltas.items():
+            df[col] = df[col].astype('int64').astype(deltaunit)
         df = df.set_index(index)
         df = df.sort_index()
+        df.columns = [c.split('.')[-1] for c in df.columns]
         return df
     return read_csv
 
@@ -80,7 +92,6 @@ def armt_read_csv_funcs(protocol):
     for armt in protocol.values():
         name = armt.questionnaire.avsc + '_' + armt.questionnaire.name
         _data_load_funcs[name] = delayed_read(read_armt_csv)
-    pass
 
 if config.schema.read_csvs:
     from ..util import schemas as _schemas
@@ -89,3 +100,27 @@ if config.schema.read_csvs:
 if config.protocol.url or config.protocol.file:
     from ..util import protocol as _protocol
     armt_read_csv_funcs(_protocol.protocols)
+
+# Fitbit temp
+_data_load_funcs['connect_fitbit_intraday_steps'] = \
+        delayed_read(read_prmt_csv,
+                timecols=['value.time', 'value.timeReceived'],
+                timedeltas={'value.timeInterval':'timedelta64[s]'})
+
+_data_load_funcs['connect_fitbit_intraday_heart_rate'] = \
+        delayed_read(read_prmt_csv,
+                timecols=['value.time', 'value.timeReceived'],
+                timedeltas={'value.timeInterval':'timedelta64[s]'})
+
+
+def temp_read_fitbit_sleep(f):
+    pd.read_csv(f)
+
+_data_load_funcs['connect_fitbit_sleep_stages'] = \
+        delayed_read(read_prmt_csv,
+                timecols=['value.dateTime', 'value.timeReceived'],
+                timedeltas={'value.duration': 'timedelta64[s]'},
+                index='value.dateTime')
+
+
+
