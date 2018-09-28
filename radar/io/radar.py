@@ -13,6 +13,9 @@ DT_MULT = int(1e9)
 def delayed_read(func, *args, **kwargs):
     def read(path):
         df = func(path, *args, **kwargs)
+        # temp workaround for fitbit sleep
+        if df.divisions == (None, None):
+            df.divisions = (df.index.head()[0], df.tail().index[-1])
         return df
     return read
 
@@ -53,9 +56,11 @@ def read_prmt_csv(dtype=None, timecols=None,
                             .astype('int64'))\
                         .tz_localize('UTC')
             else:
-                df[col] = pd.to_datetime(df[col])
+                df[col] = pd.DatetimeIndex(pd.to_datetime(df[col]))
+
         for col, deltaunit in timedeltas.items():
             df[col] = df[col].astype('int64').astype(deltaunit)
+
         df.columns = [c.split('.')[-1] for c in df.columns]
         columns_no_timeRec = [x for x in df.columns if x != 'timeReceived']
         df = df.drop_duplicates(subset=columns_no_timeRec)
@@ -123,6 +128,3 @@ _data_load_funcs['connect_fitbit_sleep_stages'] = \
                 timecols=['value.dateTime', 'value.timeReceived'],
                 timedeltas={'value.duration': 'timedelta64[s]'},
                 index='dateTime')
-
-
-
