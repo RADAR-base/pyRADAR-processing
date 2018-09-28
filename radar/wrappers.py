@@ -173,6 +173,7 @@ class Project(RadarObject):
         for p in paths:
             name = p.split('/')[-1]
             if name in self.participants:
+                ptc = self.participants[name]
                 ptc.add_path(p, **kwargs.get('datakw', {}))
             else:
                 ptc = self.add_participant(name, paths=p, **kwargs)

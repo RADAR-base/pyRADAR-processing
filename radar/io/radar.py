@@ -57,7 +57,8 @@ def read_prmt_csv(dtype=None, timecols=None,
         for col, deltaunit in timedeltas.items():
             df[col] = df[col].astype('int64').astype(deltaunit)
         df.columns = [c.split('.')[-1] for c in df.columns]
-        df = df.drop_duplicates()
+        columns_no_timeRec = [x for x in df.columns if x != 'timeReceived']
+        df = df.drop_duplicates(subset=columns_no_timeRec)
         df = df.set_index(index)
         df = df.sort_index()
         return df
@@ -116,10 +117,6 @@ _data_load_funcs['connect_fitbit_intraday_heart_rate'] = \
         delayed_read(read_prmt_csv,
                 timecols=['value.time', 'value.timeReceived'],
                 timedeltas={'value.timeInterval':'timedelta64[s]'})
-
-
-def temp_read_fitbit_sleep(f):
-    pd.read_csv(f)
 
 _data_load_funcs['connect_fitbit_sleep_stages'] = \
         delayed_read(read_prmt_csv,
