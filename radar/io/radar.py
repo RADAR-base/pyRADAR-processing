@@ -56,9 +56,10 @@ def read_prmt_csv(dtype=None, timecols=None,
                 df[col] = pd.to_datetime(df[col])
         for col, deltaunit in timedeltas.items():
             df[col] = df[col].astype('int64').astype(deltaunit)
+        df.columns = [c.split('.')[-1] for c in df.columns]
+        df = df.drop_duplicates()
         df = df.set_index(index)
         df = df.sort_index()
-        df.columns = [c.split('.')[-1] for c in df.columns]
         return df
     return read_csv
 
