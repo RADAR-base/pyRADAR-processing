@@ -125,7 +125,7 @@ _data_load_funcs['connect_fitbit_sleep_stages'] = \
         delayed_read(read_prmt_csv,
                 timecols=['value.dateTime', 'value.timeReceived'],
                 timedeltas={'value.duration': 'timedelta64[s]'},
-                index='value.dateTime')
+                index='dateTime')
 
 
 
