@@ -115,7 +115,7 @@ class Project(RadarObject):
             self.ptcs_update_info(info)
 
         labels = kwargs.get('labels', False)
-        if info:
+        if labels:
             for ptc in labels:
                 if ptc not in self.participants:
                     self.add_participant(ptc)
