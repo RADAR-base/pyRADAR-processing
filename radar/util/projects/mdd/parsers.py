@@ -71,7 +71,9 @@ class RedcapMDD():
             df[c].fillna(method='ffill', inplace=True)
         for c in df.columns:
             if 'timestamp' in c:
-                df[c] = pd.to_datetime(df[c])
+                df[c] = pd.to_datetime(df[c]).dt.tz_localize(timezone)
+        df['enrolment_date'] = pd.to_datetime(df['enrolment_date'])
+        df['enrolment_date'] = df['enrolment_date'].dt.tz_localize(timezone)
         self.df = df
         self.tz = timezone
         self.labels_as_dict = labels_as_dict
@@ -136,6 +138,7 @@ class RedcapMDD():
         df = self.df.drop_duplicates('record_id', keep='first')
         for sid, r in df.groupby('subject_id'):
             info[sid] = {}
+            info[sid]['record_id'] = r.iloc[0]['record_id']
             for cat, fields in INFO:
                 info[sid][cat] = r.iloc[0][fields].to_dict()
         return info
