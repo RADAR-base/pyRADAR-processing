@@ -78,6 +78,7 @@ def read_armt_csv(index=config.io.index):
                     'startTime', 'endTime'):
             df[col] = pd.DatetimeIndex(1e9 * df[col].values.astype('float'))\
                                         .tz_localize('UTC')
+        df.columns = [c.split('.')[-1] for c in df.columns]
         df['arrid'] = df.index
         df = df.set_index(index)
         df = df.sort_index(kind='mergesort')
