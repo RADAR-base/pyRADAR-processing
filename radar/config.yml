@@ -1,5 +1,5 @@
 schema:
-    dir: '/home/ubuntu/RADAR-Schemas/commons'
+    dir: '/home/cstewartbrc/RADAR-base/RADAR-Schemas/commons'
     key_cols: ['projectId', 'userId', 'sourceId']
     read_csvs: True
 
