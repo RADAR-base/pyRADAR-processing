@@ -29,10 +29,11 @@ def time_span(dataframe, ycols, timespan, xcol=None, fig=None, colors=None):
     if colors is None:
         colors = DEFAULT_COLORS
 
+    n = len(ycols)
     for i, column in enumerate(ycols):
         color = colors[i%len(colors)]
         name = column.split('.')[-1]
-        fig.line(xcol, df[column], line_color=color, legend=name)
+        fig.line(xcol, df[column], line_color=color, legend=name if n > 1 else None)
     fig.toolbar.logo = None
 
     return fig

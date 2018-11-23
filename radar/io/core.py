@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import pandas as pd
 from functools import lru_cache
 from dask.utils import import_required
 from dask.bytes.core import _filesystems, get_fs_token_paths
@@ -43,3 +44,7 @@ def get_fs(protocol, **storage_options):
 
     fs = cls(**storage_options)
     return fs
+
+def read_csv():
+
+    pass

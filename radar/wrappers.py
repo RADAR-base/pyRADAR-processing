@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
-from . import io
+from . import config
+from .generic import AttrRecDict, update
 from .common import abs_path, log
-from .generic import AttrRecDict
+from .io.generic import search_project_dir, search_dir_for_data, load_data_path
+from .io.core import get_fs
+from dask.bytes.utils import infer_storage_options
+
+class PtcDict(AttrRecDict):
+    def __repr__(self):
+        return 'Participants:\n\t' + '\n\t'.join(self._get_keys())
 
 class RadarObject():
     _parent = None
@@ -27,7 +34,7 @@ class RadarObject():
         parent = self._parent
         if parent is None:
             return '/'
-        path = '/' + self.name
+        path = '/' + (self.name if hasattr(self, 'name') else '')
         while parent._parent is not None:
             path = '/' + parent.name + path
             parent = parent._parent
@@ -54,21 +61,66 @@ class RadarObject():
 class Project(RadarObject):
     """
     """
-    def __init__(self, name='', parent=None, paths=None,
-                 schemas=None, specifications=None,
-                 armt_definitions=None, armt_protocols=None, **kwargs):
+    def __init__(self, name='', paths=None, parent=None, **kwargs):
+        """
+        Parameters
+        __________
+        name : str
+            The name of the project
+        paths : list / str
+            Path(s) containing project data
+        parent : radar.Project / None
+            A radar.Project instance if the project is a subproject, else None
+        subprojects : list
+            A list of subprojects to load in paths
+        participants : list
+            A list of participants to load in paths
+        blacklist : list
+            Files/folders to ignore in paths
+        ptckw : dict
+            Participant keywords
+        datakw : dict
+            Keywords for participant's data loading
+        info : dict
+            dict of dicts (key = participant id, inner dict = participant info)
+        labels : dict
+            dict of dicts (key = participant id, inner dict = participant labels)
+        schemas : None
+            --
+        specifications : None
+            --
+        armt_definitions : None
+            --
+        armt_protocols : None
+            --
+        """
         self.name = name
         self._parent = parent
         self._paths = []
-        self.schemas = schemas
-        self.specifications = specifications
-        self.armt_definitions = armt_definitions
-        self.armt_protocols = armt_protocols
+        # self.schemas = schemas
+        # self.specifications = specifications
+        # self.armt_definitions = armt_definitions
+        # self.armt_protocols = armt_protocols
         self.subprojects = AttrRecDict()
         self.participants = self._parent.participants[self.name] if \
-                self._parent else AttrRecDict()
+                self._parent else PtcDict()
         for path in self._norm_paths(paths):
             self.add_path(path, **kwargs)
+
+        info = kwargs.get('info', False)
+        if info:
+            for ptc in info:
+                if ptc not in self.participants:
+                    self.add_participant(ptc)
+            self.ptcs_update_info(info)
+
+        labels = kwargs.get('labels', False)
+        if labels:
+            for ptc in labels:
+                if ptc not in self.participants:
+                    self.add_participant(ptc)
+                self.ptcs_update_labels(labels)
+
 
     def __getitem__(self, key):
         if key in self.subprojects:
@@ -77,18 +129,6 @@ class Project(RadarObject):
             return getattr(self.participants, key)
         else:
             raise KeyError('No such subproject or participant: {}'.format(key))
-
-    def save_project(self, output=None, *args, **kwargs):
-        """OLD
-        if output is None:
-            output = self._get_attr_or_parents('output')
-        for sp in self.subprojects:
-            output.create_subproject(name=sp.name, where=self._get_path())
-            sp.save_project(output=output, *args, **kwargs)
-        for ptc in self.participants:
-            ptc.save_all(output=output)
-            """
-        pass
 
     def add_participant(self, name, where='.', *args, **kwargs):
         proj = self if where == '.' else self.subprojects[where]
@@ -110,37 +150,43 @@ class Project(RadarObject):
                       'used as a participant in project {}'.format(proj.name))
             return None
         else:
-            proj.participants[name] = AttrRecDict()
+            proj.participants[name] = PtcDict()
             proj.subprojects[name] = Project(name=name, parent=self,
                                              *args, **kwargs)
         return proj.subprojects[name]
 
     def _parse_path(self, path, subprojects=None, participants=None,
                     blacklist=None, **kwargs):
-        dir_dict = io.generic.get_project_dir(path,
-                                              subprojects=subprojects,
-                                              participants=participants,
-                                              blacklist=blacklist)
+        dir_dict = search_project_dir(path,
+                                      subprojects=subprojects,
+                                      participants=participants,
+                                      blacklist=blacklist)
         return dir_dict
 
     def _add_subprojects(self, paths, **kwargs):
         for p in paths:
             name = p.split('/')[-1]
             sp = self.add_subproject(name, **kwargs)
-            sp.add_path(p)
+            sp.add_path(p, **kwargs)
 
     def _add_participants(self, paths, **kwargs):
         for p in paths:
             name = p.split('/')[-1]
-            ptc = self.add_participant(name, **kwargs)
-            ptc.add_path(p, **kwargs.get('datakw', {}))
+            if name in self.participants:
+                ptc = self.participants[name]
+                ptc.add_path(p, **kwargs.get('datakw', {}))
+            else:
+                ptc = self.add_participant(name, paths=p, **kwargs)
 
     def add_path(self, path, **kwargs):
         self._paths.append(path)
         dir_dict = self._parse_path(path, **kwargs)
-        self._add_subprojects(dir_dict['subprojects'])
-        self._add_participants(dir_dict['participants'],
-                               **kwargs.get('ptckw', {}))
+        self._add_subprojects(dir_dict['subprojects'], **kwargs)
+        ptckw = kwargs.get('ptckw', {})
+        ptckw.update(config.project.ptckw)
+        datakw = kwargs.get('datakw', {})
+        datakw.update(config.project.datakw)
+        self._add_participants(dir_dict['participants'], datakw=datakw, **ptckw)
 
     def __repr__(self):
         return 'RADAR {} of type {}: {}, {} participants'\
@@ -168,36 +214,61 @@ class Project(RadarObject):
             return func(ptc, *args, **kwargs)
         return map(ptc_func, list(self.participants))
 
+    def _ptc_update_dict(self, new_dict, dictname):
+        for ptc in self.participants:
+            old_dict = getattr(ptc, dictname)
+            update(old_dict, new_dict.get(ptc.name, {}))
+
+    def ptcs_update_labels(self, labels):
+        self._ptc_update_dict(labels, 'labels')
+
+    def ptcs_update_info(self, info):
+        self._ptc_update_dict(info, 'info')
+
 
 class Participant(RadarObject):
     """ A class to hold data and methods concerning participants/subjects in a
     RADAR trial. Typically intialised by opening a Project.
     """
-    def __init__(self, name=None, paths=None, info=None, **kwargs):
-        if not (name or folder or 'paths' in kwargs):
+    def __init__(self, name=None, paths=None, **kwargs):
+        """
+        Parameters
+        __________
+        name : str
+
+        paths : str or list
+
+        info : dict (optional)
+
+        labels : dict (optional)
+
+        datakw : dict (optional)
+            Keywords for participant's data loading
+        """
+        if not (name or paths):
             raise ValueError(('You must specify a name or else provide'
                               'a path (or paths) to the participant'))
-
         self.name = name if name is not None \
                          else paths[0].split('/')[-1]
         self._parent = kwargs.get('parent', None)
-        self.info = kwargs.get('info', {}) 
+        self.info = kwargs.get('info', {})
         self.labels = kwargs.get('labels', {})
-        self.data = ParticipantData(self, **kwargs.get('datakw', {}))
+        datakw = kwargs.get('datakw', {})
+        datakw.update(config.project.datakw)
+        self.data = ParticipantData(self, **datakw)
         self._paths = []
-        paths = [paths] if type(paths) == 'str' else\
-                [] if paths is None else paths
-        for p in paths:
-            self.add_path(p, **kwargs.get('datakw', {}))
+        for p in self._norm_paths(paths):
+            self.add_path(p, **datakw)
 
     def __repr__(self):
         return "Participant {}. of type {}".format(self.name, type(self))
 
     def add_path(self, path, **kwargs):
-        self._paths.append(self._norm_paths(path))
+        self._paths.append(path)
         self.data._search_path(path, **kwargs)
 
     def reparse_data(self, **datakw):
+        datakw.update(config.project.datakw)
         self.data = ParticipantData(self, paths=self._paths, **datakw)
 
     def export_data(self, data=None, names=None, project_path=None,
@@ -245,14 +316,20 @@ class ParticipantData(RadarObject):
         for path in paths:
             self._search_path(path, **kwargs)
 
+    def __repr__(self):
+        topics = list(self._data.keys())
+        topics.sort()
+        return 'Participant data topics:\n {}'\
+                .format(', '.join(topics) if topics else 'None')
+
     def _search_path(self, path, replace=False, **kwargs):
-        modals = io.generic.search_dir_for_data(path, **kwargs)
+        modals = search_dir_for_data(path, **kwargs)
         for k, v in modals.items():
             if replace or (k not in self._data):
                 self._data[k] = modals[k]
 
     def _load(self, name, path, **kwargs):
-        data = io.generic.load_data_path(path, **kwargs)
+        data = load_data_path(path, **kwargs)
         if isinstance(data, dict):
             self._data.update(data)
         else:

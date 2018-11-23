@@ -1,49 +1,40 @@
 #!/usr/bin/env python3
 import glob
-import os
 import yaml
+import requests
 from collections import OrderedDict
-from ..defaults import _SPECIFICATION_DIR
-from ..common import RecursiveDict
+from ..defaults import config, schemas, specifications
 
-
-class ProjectSpecs(OrderedDict):
+class ProjectSpecs(dict):
     """
-    A class to hold all YML specifications relating to a RADAR project
+    A dictionary class to hold all YML specifications relating to a
+    RADAR project
+    Parameters
+    __________
+    device_specifications : list of DeviceSpec
+        A list of device specification objects
     """
-    def __init__(self, spec_dir: str = _SPECIFICATION_DIR):
-        """
-        A path (str) to a RADAR specification directory should be given to
-        initialise the class. It will use the package default specifications if
-        no path is given.
-        """
-        self.devices = {}
-        self.add_spec_folder(spec_dir)
+    def __init__(self, device_specifications):
+        self.devices = {dev.name: dev for dev in device_specifications}
+        for dev in self.devices.values():
+            self.update(dev)
 
     def __repr__(self):
         repr_string = 'Specification dictionary with:\n' + \
                       'Devices: {}\n'.format(', '.join(self.devices)) + \
-                      'Specs: {}'.format(', '.join(self))
+                      'Specifications: {}'.format(', '.join(self))
         return repr_string
 
-    def add_spec_folder(self, path: str):
-        specs = glob.glob(os.path.join(*os.path.split(path), '**', '*.yml'))
-        for sp in specs:
-            dev = DeviceSpec(sp)
-            name = '_'.join((dev.vendor if hasattr(dev, 'vendor') else '',
-                             dev.model if hasattr(dev, 'model') else ''))
-            if name:
-                self.devices[name] = dev
-            self.update(dev)
 
-
-class DeviceSpec(OrderedDict):
+class DeviceSpec(dict):
     """
-    A class to store RADAR YML specifications
+    A dictionary class to store RADAR YML specifications
+    Parameters
+    _________
+    yml: dict
+        A dictionary loaded with yaml.load(file)
     """
-    def __init__(self, specification_file: str):
-        with open(specification_file) as f:
-            yml = yaml.load(f.read())
+    def __init__(self, yml: dict):
 
         for attr, val in yml.items():
             if not isinstance(val, str):
@@ -54,13 +45,15 @@ class DeviceSpec(OrderedDict):
             if not hasattr(self, attr):
                 setattr(self, attr, '')
 
+        self.name = '_'.join((self.vendor, self.model, self.version))
+
         super(DeviceSpec, self).__init__([(mdl['topic'], ModalitySpec(mdl))
               for mdl in yml['data'] if ('data' in yml and 'topic' in mdl)])
 
 
-class ModalitySpec(OrderedDict):
+class ModalitySpec(dict):
     """
-    A class to store the modalities of a RADAR specification.
+    A dictionary class to store the modalities of a RADAR specification.
     """
 
     def __init__(self, modal:dict):
@@ -78,18 +71,17 @@ class ModalitySpec(OrderedDict):
         return repr_string
 
     def group_fields(self, ):
-
-        return 0
+        return -1
 
     def _type_columns(self, coltype):
         return [name for name, col in self.items()
                 if 'type' in col and
                 col['type'] == coltype]
 
-    def time_columns(self):
+    def timecols(self):
         return self._type_columns('TIMESTAMP')
 
-    def timedelta_columns(self):
+    def timedeltas(self):
         return self._type_columns('DURATION')
 
     def dtype(self):
@@ -107,3 +99,39 @@ class FieldSpec(OrderedDict):
         repr_string = '"{}" field: (({}))'.format(self['name'],
                 '), ('.join([': '.join((k, v)) for k, v in self.items()]))
         return repr_string
+
+
+def specifications_from_directory(path=config.specifications.dir):
+    files = glob.glob(path + '/**/*.yml', recursive=True)
+    ymls = []
+    for fn in files:
+        with open(fn) as f:
+            ymls.append(yaml.load(f))
+    return ProjectSpecs([DeviceSpec(y) for y in ymls])
+
+def specifications_from_github(repo_owner=config.specifications.github_owner,
+                               repo_name=config.specifications.github_repo,
+                               sha=config.specifications.github_sha):
+    url = 'https://api.github.com/repos/{}/{}/contents/specifications/'\
+            .format(repo_owner, repo_name)
+
+    rawurl = 'https://raw.githubusercontent.com/{}/{}/{}/'\
+            .format(repo_owner, repo_name, sha)
+
+    def ls(relpath):
+        requrl = url + relpath
+        return requests.get(requrl,
+                            params={'ref': 'master' if sha is None else sha})
+
+    def dl(relpath):
+        return requests.get(rawurl + relpath).content
+
+    folders = ('active', 'connector', 'monitor', 'passive')
+    files = [f['path'] for folder in folders for f in ls(folder).json()]
+    ymls = [yaml.load(dl(spec)) for spec in files]
+    return ProjectSpecs([DeviceSpec(y) for y in ymls])
+
+if config.specifications.dir:
+    specifications.update(specifications_from_directory())
+elif config.specifications.git:
+    specifications.update(specifications_from_github())
