@@ -67,7 +67,7 @@ class Project(RadarObject):
         __________
         name : str
             The name of the project
-        paths : list / str
+        path : list / str
             Path(s) containing project data
         parent : radar.Project / None
             A radar.Project instance if the project is a subproject, else None
@@ -104,8 +104,8 @@ class Project(RadarObject):
         self.subprojects = AttrRecDict()
         self.participants = self._parent.participants[self.name] if \
                 self._parent else PtcDict()
-        for path in self._norm_paths(paths):
-            self.add_path(path, **kwargs)
+        for p in self._norm_paths(path):
+            self.add_path(p, **kwargs)
 
         info = kwargs.get('info', False)
         if info:
