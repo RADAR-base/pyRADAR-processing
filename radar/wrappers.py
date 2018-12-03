@@ -61,7 +61,7 @@ class RadarObject():
 class Project(RadarObject):
     """
     """
-    def __init__(self, name='', paths=None, parent=None, **kwargs):
+    def __init__(self, path=None, name='', parent=None, **kwargs):
         """
         Parameters
         __________

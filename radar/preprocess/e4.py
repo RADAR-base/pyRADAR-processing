@@ -50,6 +50,10 @@ def drift_filter(delta):
         filt[filt.diff() < -5e7] = np.nan
         return filt
 
+    def find_starts(filt):
+        starts = filt.index[np.logical_and(filt.diff() > 1e7, filt > 0)]
+        return starts
+
     def fix_starts(filt, starts):
         for s in starts:
             filt.loc[s:s + (2*SEC)] = filt[s + (2*SEC):s + (3*SEC)].max()
@@ -57,8 +61,8 @@ def drift_filter(delta):
         return filt
 
     filt = delta.rolling('20s').min()
-    filt = split_peaks(filt)
-    starts = delta.index[delta.index.to_series().diff() > SEC]
+    # filt = split_peaks(filt)
+    starts = find_starts(filt)
     filt = fix_starts(filt, starts)
     return filt
 
@@ -72,10 +76,12 @@ def get_segments(series):
     segments: list
     """
     nans = consecutive(np.where(series.isna())[0])
+    if len(nans[0]) == 0:
+        return [(0, len(series))]
     segments = [(0, nans[0][0])]
     for i in range(len(nans)-1):
         segments.append((nans[i][-1] + 1, nans[i+1][0]))
-    if not np.isnan(series[-1]):
+    if not np.any(np.isnan(series.iloc[-1])):
         segments.append((nans[-1][-1] + 1, len(series)))
     return segments
 
