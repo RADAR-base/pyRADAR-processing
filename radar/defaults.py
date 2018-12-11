@@ -64,6 +64,7 @@ def update(d, u):
             d[k] = v
     return d
 
+      package_dir={'radar': 'radar'},
 
 _CONFIG_DEFAULT_FILE = os.path.join(_ROOT, 'config.yml')
 if os.path.exists(_CONFIG_DEFAULT_FILE):

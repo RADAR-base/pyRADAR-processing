@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 from setuptools import setup, find_packages
+import glob
+
+schema_files = glob.glob('radar/Schemas/commons', recursive=True)
+spec_files = glob.glob('radar/Schemas/specifications/**', recursive=True)
+extra_files = schema_files + spec_files + ['radar/config.yml']
 
 setup(name='radarstudy',
       version='0.2',
@@ -19,5 +24,6 @@ setup(name='radarstudy',
           'bokeh',
           'yml'
       ],
-      include_package_data=True
+      include_package_data=True,
+      package_data={'': extra_files}
 )
