@@ -2,6 +2,8 @@
 import pandas as pd
 import numpy as np
 
+DAY = pd.Timedelta('1D')
+
 class RedcapCsv():
     """ A class to parse information from an EPI Redcap CSV extract.
         The data dictionary can be found on the radar-base github.
@@ -68,6 +70,6 @@ class RedcapCsv():
             info[code]['recording_start'] = \
                     pd.to_datetime(recording_start).tz_localize(self.tz)
             info[code]['recording_end'] = \
-                    pd.to_datetime(recording_end).tz_localize(self.tz)
+                    pd.to_datetime(recording_end).tz_localize(self.tz) + DAY
         return info
 
