@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='radarstudy',
       version='0.2',
@@ -7,7 +7,8 @@ setup(name='radarstudy',
       url='https://github.com/RADAR-base/pyRADAR-processing',
       author='Callum Stewart',
       author_email='callum.stewart@kcl.ac.uk',
-      packages=['radar'],
+      setup_requires=[ "setuptools_git >= 0.3", ],
+      packages=find_packages(),
       install_requires=[
           'numpy',
           'scipy',
@@ -18,8 +19,5 @@ setup(name='radarstudy',
           'bokeh',
           'yml'
       ],
-      package_dir={'radar': 'radar'},
-      package_data={'schemas': 'Schemas/*',
-                    'config': 'radar/config.yml'},
       include_package_data=True
 )

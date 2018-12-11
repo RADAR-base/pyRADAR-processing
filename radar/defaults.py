@@ -64,7 +64,10 @@ def update(d, u):
             d[k] = v
     return d
 
-with open(os.path.join(os.path.split(__file__)[0], 'config.yml')) as f:
+
+_CONFIG_DEFAULT_FILE = os.path.join(_ROOT, 'config.yml')
+if os.path.exists(_CONFIG_DEFAULT_FILE):
+with open(_CONFIG_DEFAULT_FILE) as f:
     update(config, yaml.load(f))
 
 if 'config.yml' in os.listdir():
