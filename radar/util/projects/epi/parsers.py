@@ -63,8 +63,11 @@ class RedcapCsv():
             recording_start = ptc.start_date.iloc[0]
             recording_end = ptc.recording_end_date.iloc[0]
             info[code] = {}
-            info[code]['enrolment_date'] = pd.to_datetime(enrolled)
-            info[code]['recording_start'] = pd.to_datetime(recording_start)
-            info[code]['recording_end'] = pd.to_datetime(recording_end)
+            info[code]['enrolment_date'] = \
+                    pd.to_datetime(enrolled).tz_localize(self.tz)
+            info[code]['recording_start'] = \
+                    pd.to_datetime(recording_start).tz_localize(self.tz)
+            info[code]['recording_end'] = \
+                    pd.to_datetime(recording_end).tz_localize(self.tz)
         return info
 
