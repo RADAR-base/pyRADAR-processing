@@ -1,0 +1,2 @@
+recursive-include radar/Schemas/commons *
+recursive-include radar/Schemas/specifications *
