@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 from setuptools import setup, find_packages
-import glob
-
 
 setup(name='radarstudy',
       version='0.2',
@@ -9,7 +7,6 @@ setup(name='radarstudy',
       url='https://github.com/RADAR-base/pyRADAR-processing',
       author='Callum Stewart',
       author_email='callum.stewart@kcl.ac.uk',
-      setup_requires=[ "setuptools_git >= 0.3", ],
       packages=find_packages(),
       install_requires=[
           'numpy',
@@ -20,6 +17,6 @@ setup(name='radarstudy',
           'matplotlib',
           'bokeh',
           'yml'
-      ],
+          ],
       include_package_data=True,
 )
