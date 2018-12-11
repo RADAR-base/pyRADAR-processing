@@ -1,4 +1,4 @@
-# pyradar
+# radarstudy - RADAR processing library
 A python processing and visualisation package for use with offline RADAR project data.
 
 WIP.
@@ -14,8 +14,8 @@ Additional dependencies may be useful, for example to read or write
 parquet files fastparquet or pyarrow is required. These are largely
 in line with dask's optional dependencies.
 
+# Quickstart
 
-# Quickstart
 By default, a folder structure following the standard RADAR output
 folder is expected. I.e. a top-level project directory that contains
 participant folders, each participant folder contains data topic
