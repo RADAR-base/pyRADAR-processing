@@ -18,5 +18,8 @@ setup(name='radarstudy',
           'bokeh',
           'yml'
       ],
+      package_dir={'radar': 'radar'},
+      package_data={'schemas': 'Schemas/*',
+                    'config': 'radar/config.yml'},
       include_package_data=True
 )

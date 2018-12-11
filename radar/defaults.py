@@ -5,6 +5,10 @@ specifications = {}
 protocols = {}
 definitions = {}
 
+_ROOT = os.path.abspath(os.path.dirname(__file__))
+_DEF_RADAR_SCHEMA_PATH = os.path.join(_ROOT, 'Schemas', 'commons')
+_DEF_RADAR_SPECS_PATH = os.path.join(_ROOT, 'Schemas', 'specifications')
+
 # Config
 class Config(dict):
     def __getitem__(self, key):
@@ -22,6 +26,7 @@ class Config(dict):
             val = Config(val)
         dict.__setitem__(self, key, val)
 
+
 config = Config()
 config.aRMT = {}
 config.io = {}
@@ -32,13 +37,13 @@ config.specifications = {}
 config.project = {}
 config.schema.device = 'android'
 config.schema.key = None
-config.schema.dir = None
+config.schema.dir = _DEF_RADAR_SCHEMA_PATH
 config.schema.git = False
 config.schema.github_owner = 'RADAR-base'
 config.schema.github_repo = 'RADAR-Schemas'
 config.schema.github_sha = None
 config.schema.read_csvs = True
-config.specifications.dir = None
+config.specifications.dir = _DEF_RADAR_SPECS_PATH
 config.specifications.git = False
 config.specifications.github_owner = 'RADAR-base'
 config.specifications.github_repo = 'RADAR-Schemas'
