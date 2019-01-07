@@ -33,7 +33,7 @@ class RedcapCsv():
         cols = ('clin_start', 'clin_end', 'eeg_start', 'eeg_end')
         for c in cols:
             df[c] = pd.to_datetime(df.rep_seizure_date + 'T' +
-                                   df['rep_seizure_' + c])
+                    df['rep_seizure_' + c].str.replace('.', ':'))
         df['start'] = df[['clin_start', 'eeg_start']].min(axis=1)
         df['end'] = df[['clin_end', 'eeg_end']].min(axis=1)
         df.start = df.start.dt.tz_localize(self.tz)

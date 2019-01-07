@@ -30,7 +30,7 @@ def melt(df):
         for col, data in col_data:
             melt[col] = data
         return melt
-    out = pd.concat(melt_row(df[i:i+1], ids) for i in range(len(df)))
+    out = pd.concat([melt_row(df[i:i+1], ids) for i in range(len(df))], sort=True)
     out['startTime'] = out.startTime.astype('float')
     out['endTime'] = out.endTime.astype('float')
     return out

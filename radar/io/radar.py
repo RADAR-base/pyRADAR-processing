@@ -76,7 +76,7 @@ def read_armt_csv(index=config.io.index):
         df = melt(df)
         for col in ('value.time', 'value.timeCompleted',
                     'startTime', 'endTime'):
-            df[col] = pd.DatetimeIndex(1e9 * df[col].values.astype('float'))\
+            df[col] = pd.DatetimeIndex((DT_MULT * df[col].values.astype('float')).astype('int'))\
                                         .tz_localize('UTC')
         df.columns = [c.split('.')[-1] for c in df.columns]
         df['arrid'] = df.index
@@ -84,6 +84,12 @@ def read_armt_csv(index=config.io.index):
         df = df.sort_index(kind='mergesort')
         if 'questionId' not in df:
             df['questionId'] = ''
+        if 'timeNotification' not in df:
+            df['timeNotification'] = pd.Timestamp('nat')
+        else:
+            df['timeNotification'] = (DT_MULT * df[col].values.astype('float')).astype('int')
+        df['timeNotification'] = \
+                pd.DatetimeIndex(df['timeNotification']).tz_localize('UTC')
         return df
     return read_csv
 
