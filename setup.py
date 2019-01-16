@@ -2,7 +2,7 @@
 from setuptools import setup, find_packages
 
 setup(name='radarstudy',
-      version='0.2.2',
+      version='0.2.3',
       description='Offline processing and visualisation tools for use with data from RADAR studies',
       url='https://github.com/RADAR-base/pyRADAR-processing',
       author='Callum Stewart',
