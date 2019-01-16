@@ -178,10 +178,10 @@ class SourceData(Resource):
 
 
 class ManagementPortal():
-    def __init__(self, client_id, client_secret, token_url, api_url):
+    def __init__(self, client_id, client_secret, url):
         self._client_id = client_id
-        self._token_url = token_url
-        api_url = api_url.rstrip('/') + '/'
+        self._token_url = url.rstrip('/') + '/oauth/token'
+        api_url = url.rstrip('/') + '/api/'
         self._api_url = api_url
         client = BackendApplicationClient(client_id=client_id)
         self.oauth = OAuth2Session(client=client)
