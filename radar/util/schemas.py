@@ -102,6 +102,8 @@ class RadarSchema():
                         nptype = 'float64'
             elif isinstance(dtype, dict) and dtype['type'] == 'enum':
                 nptype = pd.api.types.CategoricalDtype(dtype['symbols'])
+            elif isinstance(dtype, dict):
+                nptype = AVRO_NP_TYPES.get(dtype['type'], np.object)
             else:
                 nptype = AVRO_NP_TYPES.get(dtype, np.object)
             return nptype
