@@ -134,6 +134,10 @@ _data_load_funcs = {}
 def get_data_func(name, ext, compression, isfile):
     func = None
     ext_comp = (ext, compression)
+
+    if ext is None:
+        return (lambda *args, **kwargs: None)
+
     if name in _data_load_funcs:
         return _data_load_funcs[name]
     elif ext_comp in _data_load_funcs:
@@ -177,10 +181,12 @@ def get_data_func(name, ext, compression, isfile):
         func = dd.read_parquet
     elif ext == 'orc':
         func = dd.read_orc
+
     if func is None:
         log.error('Unsupported data format "{}" or compression "{}"'\
                   .format(ext, compression))
         func = lambda *args, **kwargs: None
+
     _data_load_funcs[ext_comp] = func
     return func
 

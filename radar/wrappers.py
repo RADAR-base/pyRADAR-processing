@@ -3,8 +3,12 @@ from . import config
 from .generic import AttrRecDict, update
 from .common import abs_path, log
 from .io.generic import search_project_dir, search_dir_for_data, load_data_path
+from .io.radar import file_datehour
 from .io.core import get_fs
 from dask.bytes.utils import infer_storage_options
+
+import glob
+import pandas as pd
 
 class PtcDict(AttrRecDict):
     def __repr__(self):
@@ -329,7 +333,15 @@ class ParticipantData(RadarObject):
                 self._data[k] = modals[k]
 
     def _load(self, name, path, **kwargs):
+        files = glob.glob(path + '/*.csv')
+        if not files: return
+
         data = load_data_path(path, **kwargs)
+
+        divs = [file_datehour(f) for f in files]
+        divs.insert(len(divs), divs[len(divs)-1] + pd.Timedelta('1h'))
+        data.divisions = divs
+
         if isinstance(data, dict):
             self._data.update(data)
         else:
