@@ -6,7 +6,7 @@ import dask.dataframe as dd
 from functools import lru_cache
 from collections import Counter
 from dask.bytes.utils import infer_compression, infer_storage_options
-from ..common import log
+from ..common import log, config
 from .core import get_fs
 
 def out_paths(path, sep, files, *args, **kwargs):
@@ -88,6 +88,17 @@ def infer_data_format(f, include='.*', exclude='.*schema.*json'):
     fs = get_fs(**infer_storage_options(f))
     f = f.rstrip(fs.sep)
     name = f.split(fs.sep)[-1]
+
+    if config.schema.from_local_file:
+        schema_regex = re_compile(config.schema.local_file_regex)
+        schema_files = [ f + '/' + x for x in fs.list_files(f) if schema_regex.match(x) ]
+        if len(schema_files) > 0:
+            from ..util.schemas import schema_from_file
+            from .radar import schema_read_csv_funcs # TODO: make this generic and not just for radar data?
+            schema = schema_from_file(schema_files[0])
+            schema_read_csv_funcs({name: schema})
+            log.debug("Loaded schema from local file {}".format( schema_files[0]))
+
     isfile = fs.isfile(f)
     if isfile:
         ext, comp = infer_file_format(f)

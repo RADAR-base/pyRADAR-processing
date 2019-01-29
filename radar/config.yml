@@ -1,6 +1,7 @@
 schema:
     key_cols: ['projectId', 'userId', 'sourceId']
     read_csvs: True
+    from_local_file: False
 
 protocol:
     url: 'https://raw.githubusercontent.com/RADAR-base/RADAR-aRMT-protocols/master/RADAR-MDD-KCL-s1/protocol.json'
