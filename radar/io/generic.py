@@ -145,6 +145,10 @@ _data_load_funcs = {}
 def get_data_func(name, ext, compression, isfile):
     func = None
     ext_comp = (ext, compression)
+
+    if ext is None:
+        return (lambda *args, **kwargs: None)
+
     if name in _data_load_funcs:
         return _data_load_funcs[name]
     elif ext_comp in _data_load_funcs:
