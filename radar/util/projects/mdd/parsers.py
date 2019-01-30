@@ -71,7 +71,7 @@ class RedcapMDD():
             df[c].fillna(method='ffill', inplace=True)
         for c in df.columns:
             if 'timestamp' in c:
-                df[c] = pd.to_datetime(df[c]).dt.tz_localize(timezone)
+                df[c] = pd.to_datetime(df[c], errors='coerce').dt.tz_localize(timezone)
         df['enrolment_date'] = pd.to_datetime(df['enrolment_date'])
         df['enrolment_date'] = df['enrolment_date'].dt.tz_localize(timezone)
         self.df = df
