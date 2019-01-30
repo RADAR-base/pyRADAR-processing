@@ -164,8 +164,8 @@ class Protocol(object):
         exp_end = expected_times.append(pd.DatetimeIndex([end_time]))
         intervals = [interval_sum(completed_times, exp_end, i, i+1)
                      for i in range(len(expected_times))]
-        return pd.DataFrame(data={'datetime': expected_times,
-                                  'questionnaires_completed': intervals})
+        return pd.DataFrame(data={'time': expected_times,
+                                  'questions_completed': intervals})
 
 def from_url(url):
     r = requests.get(url)
