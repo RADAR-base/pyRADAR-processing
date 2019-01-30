@@ -3,8 +3,14 @@ import requests
 from requests_oauthlib import OAuth2Session
 from oauthlib.oauth2 import BackendApplicationClient
 
-class Resource(object):
+
+class Resource():
+    """ A generic resource object to form part of the
+    ManagementPortal object. Sends requests using the
+    ManagementPortal.request method
+    """
     _name = ''
+
     def __init__(self, portal):
         self._portal = portal
 
@@ -36,7 +42,7 @@ class Subject(Resource):
         return self.request('DELETE', login)
 
     def get_sources(self, login):
-        return self.request('GET', log + '/sources')
+        return self.request('GET', login + '/sources')
 
     def assign_sources(self, login, **body):
         if not (('sourceTypeId' in body) or
@@ -47,6 +53,9 @@ class Subject(Resource):
                               'combination of (sourceTypeProducer,'
                               'sourceTypeModel, sourceTypeCatalogVersion)'))
         return self.request('POST', endpoint=login, json=body)
+
+    def revisions(self, login):
+        return self.request('GET', endpoint=login + '/revisions')
 
 
 class Project(Resource):
@@ -59,8 +68,8 @@ class Project(Resource):
     def get_all(self, **params):
         return self.get('', **params)
 
-    def create(self, projectName, description, location, **body):
-        body['projectName'] = projectName
+    def create(self, project_name, description, location, **body):
+        body['projectName'] = project_name
         body['description'] = description
         body['location'] = location
         return self.request('POST', json=body)
@@ -72,22 +81,22 @@ class Project(Resource):
         return self.request('PUT', json=body)
 
     def delete(self, project_name):
-        return self.request('DELETE', projectName)
+        return self.request('DELETE', project_name)
 
     def get_roles(self, project_name):
-        endpoint = projectName + '/roles'
+        endpoint = project_name + '/roles'
         return self.request('GET', endpoint)
 
     def get_source_types(self, project_name):
-        endpoint = projectName + '/source-types'
+        endpoint = project_name + '/source-types'
         return self.request('GET', endpoint)
 
     def get_sources(self, project_name, **params):
         endpoint = project_name + '/sources'
         return self.request('GET', endpoint, params=params)
 
-    def get_subjects(self, projectName, **params):
-        endpoint = projectName + '/subjects'
+    def get_subjects(self, project_name, **params):
+        endpoint = project_name + '/subjects'
         return self.request('GET', endpoint, params=params)
 
 
@@ -121,7 +130,7 @@ class SourceType(Resource):
     _name = 'source-types'
 
     def get(self, producer='', model='', version='', **params):
-        if model and not producers:
+        if model and not producer:
             raise ValueError('You must specify a producer to specify a model')
         if version and not model:
             raise ValueError('You must specify a model to specify a version')
@@ -159,7 +168,7 @@ class SourceData(Resource):
     _name = 'source-data'
 
     def get(self, source_data_name='', **params):
-        return self.request('GET', source_data_name, 
+        return self.request('GET', source_data_name,
                             params=params if not source_data_name else None)
 
     def get_all(self, **params):
@@ -178,35 +187,40 @@ class SourceData(Resource):
 
 
 class ManagementPortal():
-    def __init__(self, client_id, client_secret, url):
-        self._client_id = client_id
-        self._token_url = url.rstrip('/') + '/oauth/token'
-        api_url = url.rstrip('/') + '/api/'
-        self._api_url = api_url
-        client = BackendApplicationClient(client_id=client_id)
-        self.oauth = OAuth2Session(client=client)
-        self.get_token(client_secret)
+    """ A class to call resource REST API requests from. Requires
+    a RADAR management portal API account.
+    """
 
+    def __init__(self, client_id, client_secret, url):
+        self._url = url
+        self.authenticate(client_id, client_secret)
         self.subjects = Subject(portal=self)
         self.projects = Project(portal=self)
         self.source = Source(portal=self)
         self.source_type = SourceType(portal=self)
         self.source_data = SourceData(portal=self)
 
-    def get_token(self, client_secret):
-        self._token = self.oauth.fetch_token(token_url=self._token_url,
-                                             client_id=self._client_id,
-                                             client_secret=client_secret)
-        self._headers = {'Authorization': 'Bearer {}'\
-                            .format(self._token['access_token'])}
-        return self._token
+    def authenticate(self, client_id, client_secret):
+        def get_token(self, client_id, client_secret, oauth):
+            token_url = self._url + '/oauth/token'
+            token = oauth.fetch_token(token_url=token_url,
+                                      client_id=client_id,
+                                      client_secret=client_secret)
+            return token
+        client = BackendApplicationClient(client_id=client_id)
+        oauth = OAuth2Session(client=client)
+        token = get_token(client_id, client_secret, oauth)
+        self._headers = {
+            'Authorization': 'Bearer {}'.format(token['access_token'])
+        }
+        return token
 
     def request(self, method, endpoint, **kwargs):
-        url = self._api_url + endpoint
+        url = self._url + '/api/' + endpoint
         r = requests.request(method, url, headers=self._headers, **kwargs)
         if (r.status_code == 401 and 'error_description' in r.json() and
-            'Access token expired' in r.json()['error_description']):
-                err = ('401 Client Error: Access token has expired')
-                raise requests.HTTPError(err)
+                'Access token expired' in r.json()['error_description']):
+            err = ('401 Client Error: Access token has expired')
+            raise requests.HTTPError(err)
         r.raise_for_status()
         return r
