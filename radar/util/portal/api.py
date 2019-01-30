@@ -192,7 +192,7 @@ class ManagementPortal():
     """
 
     def __init__(self, client_id, client_secret, url):
-        self._url = url
+        self._url = url.rstrip('/')
         self.authenticate(client_id, client_secret)
         self.subjects = Subject(portal=self)
         self.projects = Project(portal=self)
@@ -201,15 +201,15 @@ class ManagementPortal():
         self.source_data = SourceData(portal=self)
 
     def authenticate(self, client_id, client_secret):
-        def get_token(self, client_id, client_secret, oauth):
-            token_url = self._url + '/oauth/token'
+        def get_token(client_id, client_secret, oauth, url):
+            token_url = url + '/oauth/token'
             token = oauth.fetch_token(token_url=token_url,
                                       client_id=client_id,
                                       client_secret=client_secret)
             return token
         client = BackendApplicationClient(client_id=client_id)
         oauth = OAuth2Session(client=client)
-        token = get_token(client_id, client_secret, oauth)
+        token = get_token(client_id, client_secret, oauth, self._url)
         self._headers = {
             'Authorization': 'Bearer {}'.format(token['access_token'])
         }
