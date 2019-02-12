@@ -271,7 +271,7 @@ class Participant(RadarObject):
         self.info = kwargs.get('info', {})
         self.labels = kwargs.get('labels', {})
         datakw = kwargs.get('datakw', {})
-        datakw.update(config.project.getdatakw)
+        datakw.update(config.project.datakw)
         self.data = ParticipantData(self, **datakw)
         self._paths = []
         for p in self._norm_paths(paths):
@@ -343,11 +343,33 @@ class ParticipantData(RadarObject):
         for path in paths:
             self._search_path(path, **kwargs)
 
+    def __getitem__(self, key):
+        val = self._data[key]
+        if isinstance(val, str):
+            self._load(key, val)
+        return self._data[key]
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __getattr__(self, key):
+        if key in self._data:
+            return self[key]
+        if hasattr(self._data, key):
+            return getattr(self._data, key)
+        raise AttributeError('No such attribute "{}" in {}'.format(key, self))
+
+    def __iter__(self):
+        return iter(self._data)
+
     def __repr__(self):
         topics = list(self._data.keys())
         topics.sort()
         return 'Participant data topics:\n {}'\
             .format(', '.join(topics) if topics else 'None')
+
+    def __dir__(self):
+        return self.keys()
 
     def _ipython_key_completions_(self):
         return list(self.keys())
@@ -367,22 +389,3 @@ class ParticipantData(RadarObject):
 
     def save(self, outpath, outfmt, data_names=None, **kwargs):
         raise NotImplementedError
-
-    def __getitem__(self, key):
-        val = self._data[key]
-        if isinstance(val, str):
-            self._load(key, val)
-        return self._data[key]
-
-    def __setitem__(self, key, value):
-        self._data[key] = value
-
-    def __getattr__(self, key):
-        if key in self._data:
-            return self[key]
-        elif hasattr(self._data, key):
-            return getattr(self._data, key)
-        raise AttributeError('No such attribute "{}" in {}'.format(key, self))
-
-    def __iter__(self):
-        return iter(self._data)
