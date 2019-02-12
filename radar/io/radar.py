@@ -52,9 +52,9 @@ def read_prmt_csv(dtype=None, timecols=None,
         df = pd.read_csv(path, *args, dtype=dtype, **kwargs)
         for col in timecols:
             if df[col].dtype == 'int' or df[col].dtype == 'float':
-                df[col] = pd.DatetimeIndex((DT_MULT * df[col].values)\
-                            .astype('int64'))\
-                        .tz_localize('UTC')
+                df[col] = pd.DatetimeIndex(
+                    (DT_MULT * df[col].values).astype('int64')
+                ).tz_localize('UTC')
             else:
                 df[col] = pd.DatetimeIndex(pd.to_datetime(df[col]))
 
@@ -87,9 +87,13 @@ def read_armt_csv(index=config.io.index):
         if 'timeNotification' not in df:
             df['timeNotification'] = pd.Timestamp('nat')
         else:
-            df['timeNotification'] = (DT_MULT * df[col].values.astype('float')).astype('int')
-        df['timeNotification'] = \
-                pd.DatetimeIndex(df['timeNotification']).tz_localize('UTC')
+            df['timeNotification'] = (DT_MULT * df['timeNotification'].values
+                                      .astype('float')).astype('int')
+        df['timeNotification'] = pd.DatetimeIndex(
+            df['timeNotification']
+            ).tz_localize('UTC').values
+        df = df[['endTime', 'projectId', 'sourceId', 'userId', 'questionId', 'startTime',
+                 'value', 'name', 'timeCompleted', 'timeNotification', 'version', 'arrid']]
         return df
     return read_csv
 
