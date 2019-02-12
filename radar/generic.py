@@ -99,6 +99,10 @@ class AttrRecDict(RecursiveDict):
         string = '\n'.join(string)
         return string
 
+    def __dir__(self):
+        return self.keys()
+
+
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
