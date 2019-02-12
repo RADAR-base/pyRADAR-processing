@@ -1,4 +1,9 @@
+""" Configuration defaults and classes
+Contains the config and also default schemas, specifications,
+protocols, and definitions.
+"""
 import os
+import collections
 import yaml
 schemas = {}
 specifications = {}
@@ -9,14 +14,16 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 _DEF_RADAR_SCHEMA_PATH = os.path.join(_ROOT, 'Schemas', 'commons')
 _DEF_RADAR_SPECS_PATH = os.path.join(_ROOT, 'Schemas', 'specifications')
 
-# Config
+
 class Config(dict):
+    """ Class that allows access to values through getattr,
+    and converts the class of setattr/setitem dicts to Config
+    """
     def __getitem__(self, key):
-        return dict.__getitem__(self, key) if key in self else None
+        return dict.get(self, key, None)
 
     def __getattr__(self, key):
-        if key in self:
-            return self[key]
+        return self.get(key, None)
 
     def __setattr__(self, key, val):
         self[key] = val
@@ -57,8 +64,11 @@ config.project.ptckw = {}
 config.project.datakw = {}
 
 
-import collections
 def update(d, u):
+    """ update nested mappings
+    d (dict): mapping to update
+    u (dict): mapping to update with
+    """
     for k, v in u.items():
         if isinstance(v, collections.Mapping):
             d[k] = update(d.get(k, {}), v)
