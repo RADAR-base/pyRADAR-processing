@@ -3,22 +3,33 @@ from . import config
 from .generic import AttrRecDict, update
 from .common import abs_path, log
 from .io.generic import search_project_dir, search_dir_for_data, load_data_path
-from .io.core import get_fs
-from dask.bytes.utils import infer_storage_options
+
 
 class PtcDict(AttrRecDict):
+    """ Dictionary to contain participants
+    It is an attribute / recursive dictionary
+    (values can be accessed through __getattribute__,
+     and sub-dictionaries can be accessed by splitting the
+     key with "/")
+    """
     def __repr__(self):
         return 'Participants:\n\t' + '\n\t'.join(self._get_keys())
 
+
 class RadarObject():
+    """ Base class for RADAR Project, Participant, and Data classes
+    Provides methods for accessing parent class attributes, although
+    several are semi-depricated
+    """
     _parent = None
+
     def _get_attr_or_parents(self, attr):
         if hasattr(self, attr) and getattr(self, attr) is not None:
             res = getattr(self, attr)
         elif getattr(self, '_parent') is None:
             res = None
         else:
-            res =  self._parent._get_attr_or_parents(attr)
+            res = self._parent._get_attr_or_parents(attr)
 
         return res
 
@@ -40,9 +51,10 @@ class RadarObject():
             parent = parent._parent
         return path
 
-    def _norm_paths(self, paths):
+    @staticmethod
+    def _norm_paths(paths):
         paths = [paths] if isinstance(paths, str) else \
-                paths if isinstance(paths ,list) else []
+                paths if isinstance(paths, list) else []
         return [abs_path(p) for p in paths]
 
     def _p_schemas(self):
@@ -82,9 +94,9 @@ class Project(RadarObject):
         datakw : dict
             Keywords for participant's data loading
         info : dict
-            dict of dicts (key = participant id, inner dict = participant info)
+            dict of dicts (key:participant id, inner dict: participant info)
         labels : dict
-            dict of dicts (key = participant id, inner dict = participant labels)
+            dict of dicts (key: participant id, inner dict: participant labels)
         schemas : None
             --
         specifications : None
@@ -97,13 +109,15 @@ class Project(RadarObject):
         self.name = name
         self._parent = parent
         self._paths = []
-        # self.schemas = schemas
-        # self.specifications = specifications
-        # self.armt_definitions = armt_definitions
-        # self.armt_protocols = armt_protocols
+        """
+        self.schemas = schemas
+        self.specifications = specifications
+        self.armt_definitions = armt_definitions
+        self.armt_protocols = armt_protocols
+        """
         self.subprojects = AttrRecDict()
         self.participants = self._parent.participants[self.name] if \
-                self._parent else PtcDict()
+            self._parent else PtcDict()
         for p in self._norm_paths(path):
             self.add_path(p, **kwargs)
 
@@ -121,6 +135,31 @@ class Project(RadarObject):
                     self.add_participant(ptc)
                 self.ptcs_update_labels(labels)
 
+    def __repr__(self):
+        return 'RADAR {} of type {}: {}, {} participants'\
+                .format('Subproject' if getattr(self, '_parent') is None
+                        else 'Project',
+                        type(self),
+                        self.name,
+                        len(self.participants))
+
+    def __str__(self):
+        info_string = '''
+        member of {class}
+        Name: {name}
+        Subprojects: {subprojs}
+        No. participants: {num_partic}
+        '''
+        format_kwargs = {
+            'class': type(self),
+            'name': self.name,
+            'subprojs': ', '.join(self.subprojects.keys()) or 'None',
+            'num_partic': len(self.participants),
+        }
+        return info_string.format(**format_kwargs)
+
+    def _ipython_key_completions_(self):
+        return list(self.participants.keys()) + list(self.subprojects.keys())
 
     def __getitem__(self, key):
         if key in self.subprojects:
@@ -133,20 +172,20 @@ class Project(RadarObject):
     def add_participant(self, name, where='.', *args, **kwargs):
         proj = self if where == '.' else self.subprojects[where]
         if name in proj.participants:
-            log.debug('participant {} already exists in project {}'\
-                       .format(name, proj.name))
+            log.debug('participant {} already exists in project {}'
+                      .format(name, proj.name))
         else:
             proj.participants[name] = Participant(name=name, parent=self,
-                                                   *args, **kwargs)
+                                                  *args, **kwargs)
         return proj.participants[name]
 
     def add_subproject(self, name, where='.', *args, **kwargs):
         proj = self if where == '.' else self.subprojects[where]
         if name in proj.subprojects:
-            log.debug('Subproject {} already exists in project {}'\
+            log.debug('Subproject {} already exists in project {}'
                       .format(name, proj.name))
         elif name in proj.participants:
-            log.error('The subproject name {} is already'.format(name) +\
+            log.error('The subproject name {} is already '.format(name) +
                       'used as a participant in project {}'.format(proj.name))
             return None
         else:
@@ -180,34 +219,13 @@ class Project(RadarObject):
 
     def add_path(self, path, **kwargs):
         self._paths.append(path)
-        dir_dict = self._parse_path(path, **kwargs)
-        self._add_subprojects(dir_dict['subprojects'], **kwargs)
+        dirs = self._parse_path(path, **kwargs)
+        self._add_subprojects(dirs['subprojects'], **kwargs)
         ptckw = kwargs.get('ptckw', {})
         ptckw.update(config.project.ptckw)
         datakw = kwargs.get('datakw', {})
         datakw.update(config.project.datakw)
-        self._add_participants(dir_dict['participants'], datakw=datakw, **ptckw)
-
-    def __repr__(self):
-        return 'RADAR {} of type {}: {}, {} participants'\
-                .format('Subproject' if getattr(self, '_parent') is None
-                        else 'Project',
-                        type(self),
-                        self.name,
-                        len(self.participants))
-
-    def __str__(self):
-        info_string = '''member of {class}
-        Name: {name}
-        Subprojects: {subprojs}
-        No. participants: {num_partic}
-        '''
-        format_kwargs = {'class': type(self),
-                         'name': self.name,
-                         'subprojs': ', '.join(self.subprojects.keys()) or 'None',
-                         'num_partic': len(self.participants),
-                        }
-        return info_string.format(**format_kwargs)
+        self._add_participants(dirs['participants'], datakw=datakw, **ptckw)
 
     def map_participants(self, func, *args, **kwargs):
         def ptc_func(ptc, *args, **kwargs):
@@ -248,13 +266,12 @@ class Participant(RadarObject):
         if not (name or paths):
             raise ValueError(('You must specify a name or else provide'
                               'a path (or paths) to the participant'))
-        self.name = name if name is not None \
-                         else paths[0].split('/')[-1]
+        self.name = name if name is not None else paths[0].split('/')[-1]
         self._parent = kwargs.get('parent', None)
         self.info = kwargs.get('info', {})
         self.labels = kwargs.get('labels', {})
         datakw = kwargs.get('datakw', {})
-        datakw.update(config.project.datakw)
+        datakw.update(config.project.getdatakw)
         self.data = ParticipantData(self, **datakw)
         self._paths = []
         for p in self._norm_paths(paths):
@@ -262,6 +279,15 @@ class Participant(RadarObject):
 
     def __repr__(self):
         return "Participant {}. of type {}".format(self.name, type(self))
+
+    def __getitem__(self, key):
+        return self.data[key]
+
+    def __setitem__(self, key, value):
+        self.data[key] = value
+
+    def _ipython_key_completions_(self):
+        return list(self.data.keys())
 
     def add_path(self, path, **kwargs):
         self._paths.append(path)
@@ -273,6 +299,7 @@ class Participant(RadarObject):
 
     def export_data(self, data=None, names=None, project_path=None,
                     filetype=None, *args, **kwargs):
+        raise NotImplementedError
         """ Exports a data object to another file or format.
         Parameters
         __________
@@ -284,11 +311,11 @@ class Participant(RadarObject):
         filetype : str
         """
         output = self._get_attr_or_parents('output')
-        given = (name, project_path, filetype)
+        given = (names, project_path, filetype)
         generic = (self.name, output['project_path'], output['filetype'])
-        name, project_path, filetype = \
-                   (x if x is not None else (generic)[i]
-                    for i, x in enumerate(given))
+        name, project_path, filetype = (
+            x if x is not None else (generic)[i]
+            for i, x in enumerate(given))
 
         """
         if not isinstance(output, ParticipantIO):
@@ -320,7 +347,10 @@ class ParticipantData(RadarObject):
         topics = list(self._data.keys())
         topics.sort()
         return 'Participant data topics:\n {}'\
-                .format(', '.join(topics) if topics else 'None')
+            .format(', '.join(topics) if topics else 'None')
+
+    def _ipython_key_completions_(self):
+        return list(self.keys())
 
     def _search_path(self, path, replace=False, **kwargs):
         modals = search_dir_for_data(path, **kwargs)
@@ -336,10 +366,7 @@ class ParticipantData(RadarObject):
             self._data[name] = data
 
     def save(self, outpath, outfmt, data_names=None, **kwargs):
-        if data_names is None:
-            data_names = list(self)
-        for data in data_names:
-            self[data]
+        raise NotImplementedError
 
     def __getitem__(self, key):
         val = self._data[key]
