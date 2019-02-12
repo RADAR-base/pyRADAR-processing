@@ -1,3 +1,9 @@
+""" Location plots using cartopy.
+Cartopy requires several libraries not available through pip.
+You should either install the requirements through your package manager
+or install cartopy using conda.
+https://scitools.org.uk/cartopy/docs/latest/installing.html
+"""
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -6,10 +12,10 @@ try:
     from cartopy.io.img_tiles import Stamen
 except ModuleNotFoundError:
     raise ImportError(
-            'Geo plotting requires cartopy\n'
-            'Installing with conda is the most straightforward approach: \n'
-            '    conda install -c conda-forge cartopy\n'
-            'https://scitools.org.uk/cartopy/docs/latest/installing.html'
+        'Geo plotting requires cartopy\n'
+        'Installing with conda is the most straightforward approach: \n'
+        '    conda install -c conda-forge cartopy\n'
+        'https://scitools.org.uk/cartopy/docs/latest/installing.html'
     )
 
 
@@ -66,7 +72,7 @@ def geo_heatmap(latitudes, longitudes, projection=None,
         bins (int): Number of bins for the heatmap
         ax: matplotlib axes object. Will create one if not given.
         fig: matplotlib figure. Will create one if not given
-        kwargs: other kwargs to provide to matplotlib.scatter
+        kwargs: other kwargs to provide to ax.hist2d
     Returns:
         matplotlib.figure.Figure
     """
@@ -90,7 +96,7 @@ def geo_heatmap(latitudes, longitudes, projection=None,
     xy = ax.projection.transform_points(ccrs.Geodetic(), longitudes.values,
                                         latitudes.values)
     ax.hist2d(xy[:, 0], xy[:, 1], norm=mpl.colors.LogNorm(), cmap=cmap,
-              bins=bins, zorder=10)
+              bins=bins, zorder=10, **kwargs)
     scale_bar(ax)
     gl = ax.gridlines(draw_labels=True, color='white')
     gl.xlabels_top = False
