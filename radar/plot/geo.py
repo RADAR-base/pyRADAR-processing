@@ -41,7 +41,7 @@ def geo_scatter(latitudes, longitudes, projection=None,
         projection = ccrs.PlateCarree()
     if ax is None:
         if fig is None:
-            fig = plt.figure(figsize=(10, 5))
+            fig = plt.figure(figsize=(8, 8))
         ax = fig.add_subplot(1, 1, 1, projection=projection)
     if extent:
         ax.set_extent(extent, crs=projection)
@@ -80,15 +80,18 @@ def geo_heatmap(latitudes, longitudes, projection=None,
     n = cmap.N
     cmap = cmap(np.arange(n))
     cmap[:, -1] = np.linspace(0.4, 0.9, n)
+    cmap[0, -1] = 0
     cmap = mpl.colors.ListedColormap(cmap)
     if projection is None:
         projection = ccrs.PlateCarree()
     if ax is None:
         if fig is None:
-            fig = plt.figure(figsize=(10, 5))
+            fig = plt.figure(figsize=(8, 8))
         ax = fig.add_subplot(1, 1, 1, projection=projection)
-    if extent:
-        ax.set_extent(extent, crs=projection)
+    if not extent:
+        extent = [longitudes.min()-0.1, longitudes.max()+0.1,
+                  latitudes.min()-0.1, latitudes.max()+0.1]
+    ax.set_extent(extent, crs=projection)
     if tiler:
         ax.add_image(tiler, zoom_level)
     else:
@@ -97,6 +100,55 @@ def geo_heatmap(latitudes, longitudes, projection=None,
                                         latitudes.values)
     ax.hist2d(xy[:, 0], xy[:, 1], norm=mpl.colors.LogNorm(), cmap=cmap,
               bins=bins, zorder=10, **kwargs)
+    scale_bar(ax)
+    gl = ax.gridlines(draw_labels=True, color='white')
+    gl.xlabels_top = False
+    gl.ylabels_right = False
+    return fig
+
+
+def geo_hexmap(latitudes, longitudes, projection=None,
+               tiler=Stamen('toner-lite'), zoom_level=8,
+               extent=None, gridsize=30, ax=None, fig=None, **kwargs):
+    """ Latitude / longitude hexmap
+    Parameters:
+        latitudes (float[n]): Numpy array of latitudes
+        longitudes (float[n]): Numpy array of longitudes
+        projection: A cartopy projection
+        tiler: A cartopy map tiler / background. Default: Stamen terrain
+        zoom_level (int): Tiler zoom level. Default: 8
+        extent (float[4]): [Long_min, Long_max, Lat_min, Lat_max]
+        gridsize (int): Gridsize of the hexs. Default: 30
+        ax: matplotlib axes object. Will create one if not given.
+        fig: matplotlib figure. Will create one if not given
+        kwargs: other kwargs to provide to ax.hist2d
+    Returns:
+        matplotlib.figure.Figure
+    """
+    cmap = mpl.cm.Greens
+    n = cmap.N
+    cmap = cmap(np.arange(n))
+    cmap[:, -1] = np.linspace(0.4, 0.9, n)
+    cmap[0, -1] = 0
+    cmap = mpl.colors.ListedColormap(cmap)
+    if projection is None:
+        projection = ccrs.PlateCarree()
+    if ax is None:
+        if fig is None:
+            fig = plt.figure(figsize=(8, 8))
+        ax = fig.add_subplot(1, 1, 1, projection=projection)
+    if not extent:
+        extent = [longitudes.min()-0.05, longitudes.max()+0.05,
+                  latitudes.min()-0.05, latitudes.max()+0.05]
+    ax.set_extent(extent, crs=projection)
+    if tiler:
+        ax.add_image(tiler, zoom_level)
+    else:
+        ax.coastlines('10m')
+    xy = ax.projection.transform_points(ccrs.Geodetic(), longitudes.values,
+                                        latitudes.values)
+    ax.hexbin(xy[:, 0], xy[:, 1], norm=mpl.colors.LogNorm(), cmap=cmap,
+              gridsize=gridsize, zorder=10, edgecolors=None, **kwargs)
     scale_bar(ax)
     gl = ax.gridlines(draw_labels=True, color='white')
     gl.xlabels_top = False
