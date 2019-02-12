@@ -136,8 +136,6 @@ class Protocol(object):
         deltas = self.expected_questionnaires(time_delta=time_delta,
                                               initial=initial, offset=offset)
         times = enrolment_time + deltas
-        if start_time.tzinfo is not None:
-            times = times.tz_localize(start_time.tzinfo.zone)
         return times[times >= start_time + pd.Timedelta(offset)]
 
     def adherence(self, df, start_time, end_time, **kwargs):
