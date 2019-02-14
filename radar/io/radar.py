@@ -64,8 +64,9 @@ def read_prmt_csv(dtype=None, timecols=None,
         df.columns = [c.split('.')[-1] for c in df.columns]
         columns_no_timeRec = [x for x in df.columns if x != 'timeReceived']
         df = df.drop_duplicates(subset=columns_no_timeRec)
-        df = df.set_index(index)
-        df = df.sort_index()
+        if index:
+            df = df.set_index(index)
+            df = df.sort_index()
         return df
     return read_csv
 
@@ -135,6 +136,12 @@ _data_load_funcs['connect_fitbit_intraday_heart_rate'] = \
                 timedeltas={'value.timeInterval':'timedelta64[s]'})
 
 _data_load_funcs['connect_fitbit_sleep_stages'] = \
+        delayed_read(read_prmt_csv,
+                timecols=['value.dateTime', 'value.timeReceived'],
+                timedeltas={'value.duration': 'timedelta64[s]'},
+                index='dateTime')
+
+_data_load_funcs['connect_fitbit_sleep_classic'] = \
         delayed_read(read_prmt_csv,
                 timecols=['value.dateTime', 'value.timeReceived'],
                 timedeltas={'value.duration': 'timedelta64[s]'},
