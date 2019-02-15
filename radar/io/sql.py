@@ -25,7 +25,9 @@ def try_sql(func: Callable[[Connection, Any], Any]) -> Callable:
             out = func(conn, *args, **kwargs)
         except psycopg2.Error as err:
             log.error('SQL error with func %s, args %s', func, args)
-            conn.cancel()
+            curs = conn.cursor()
+            curs.execute("ROLLBACK")
+            conn.commit()
             raise err
         conn.commit()
         return out
@@ -65,7 +67,10 @@ def create_table_like(conn: Connection,
         None
     """
     cur = conn.cursor()
-    cmd = sql.SQL('CREATE TABLE {} (like {})').format(
+    cmd = sql.SQL('CREATE TABLE {} (like {} '
+                  'INCLUDING DEFAULTS '
+                  'INCLUDING CONSTRAINTS '
+                  'INCLUDING INDEXES)').format(
         sql.Identifier(new_table), sql.Identifier(existing_table))
     cur.execute(cmd)
     cur.close()
@@ -86,27 +91,41 @@ def drop_table(conn: Connection, table: str):
 
 
 @try_sql
-def upsert_from_table(conn, source_table, target_table, columns):
+def upsert_from_table(conn, source_table, target_table, columns,
+                      constraints=('userid', 'time')):
     """ Copy between tables and upsert all columns.
     Currently potentially unsafe - doesn't sanitize table or
     column names - should be fixed once psycopg2 2.8 comes out
+    Args:
+        conn: psycopg2 connection
+        source_table (str): Name of table to copy from
+        target_table (str): Name of table to copy into
+        columns (list): List of column names
+        constraints (list): List of UNIQUE CONSTRAINT
+            columns in sql table
+    Returns:
+        None
     """
-    columns = [c.lower() for c in columns]
+    columns = [c.lower() for c in columns if c not in ('userid', 'time')]
     cur = conn.cursor()
     cmd_string = (
         'INSERT INTO {}'
         ' SELECT * FROM {}'
-        ' ON CONFLICT (userid, time) DO UPDATE SET ')
+        ' ON CONFLICT ( ' + ', '.join(['{}' for c in constraints]) + ')'
+        ' DO UPDATE SET '
+    )
     cmd_string += ', '.join(['{} = {}' for c in columns])
     """  # Should work in psycopg2 2.8
     cmd = sql.SQL(cmd_string).format(
                   sql.Identifier(target_table), sql.Identifier(source_table),
+                  *[sql.Identifier(c) for c in constraints],
                   *list(chain.from_iterable((
                     (sql.Identifier(c), sql.Identifier('EXCLUDED', c))
                     for c in columns))))
     """
     cmd = cmd_string.format(
         target_table, source_table,
+        *[c for c in constraints],
         *list(chain.from_iterable((
             (c, 'EXCLUDED.' + c)) for c in columns)))
     cur.execute(cmd)
@@ -124,6 +143,15 @@ def df_upsert_psql(conn: Connection, table: str, df: pd.DataFrame) -> None:
     curr_time = str(time.time()).replace('.', '_')
     tmp_table = 'staging_' + table + '_' + curr_time
     create_table_like(conn, tmp_table, table)
-    df_to_psql(conn, tmp_table, df)
-    upsert_from_table(conn, tmp_table, table, columns)
-    drop_table(conn, tmp_table)
+    try:
+        df_to_psql(conn, tmp_table, df)
+        upsert_from_table(conn, tmp_table, table, columns)
+    finally:
+        drop_table(conn, tmp_table)
+
+
+def dask_upsert_psql(pool, table, ddf) -> None:
+    def upsert_with_pool(df):
+        conn = pool.getconn()
+        return df_upsert_psql(conn, table, df)
+    return ddf.map_partitions(upsert_with_pool)
