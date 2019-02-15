@@ -1,3 +1,0 @@
-[submodule "radar/Schemas"]
-	path = radar/Schemas
-	url = git@github.com:RADAR-base/RADAR-Schemas.git
