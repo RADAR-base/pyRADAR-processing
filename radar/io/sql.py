@@ -1,17 +1,83 @@
 """ IO operations for SQL databases - currently Postgres specific
+Currently unsafe / doesn't sanatize inputs. Should work in psycopg2 2.8
 """
 import time
-from typing import Callable, Union, Any
+from typing import Callable, Union, Any, List
 from io import StringIO
 from functools import wraps
 from itertools import chain
 
-import pandas as pd
 import psycopg2
-from psycopg2 import sql
 from psycopg2.extensions import connection as Connection
+from psycopg2.pool import AbstractConnectionPool
 
+import pandas as pd
 from ..common import log
+
+
+class PostgresIOPool():
+    """ Class version of module
+    """
+    def __init__(self, pool: AbstractConnectionPool):
+        self.pool = pool
+
+    def df_to_psql(self, table: str, df: pd.DataFrame):
+        """ Insert a pandas DataFrame into a Postgres table using a
+        StringIO intermediary CSV to COPY FRO
+        Args:
+            table (str): postgres table name
+            df (pandas.DataFrame): dataframe to insert
+        Returns:
+            None
+        """
+        conn = self.pool.getconn()
+        return df_to_psql(conn, table, df)
+
+    def create_table_like(self, new_table: str, existing_table: str):
+        """ Create an SQL table based on another existing table
+        Args:
+            new_table (str): The name of the table being created
+            existing_table (str): The name of the table to copy
+        Returns:
+            None
+        """
+        conn = self.pool.getconn()
+        return create_table_like(conn, new_table, existing_table)
+
+    def drop_table(self, table: str):
+        """ Drop a table (dynamic name)
+        Args:
+            table (str): table name
+        """
+        conn = self.pool.getconnO()
+        drop_table(conn, table)
+
+    def upsert_from_table(self, source_table: str,
+                          target_table: str, columns: List[str],
+                          constraints: List[str] = ('userid', 'time')) -> None:
+        """ Copy between tables and upsert all columns.
+        Currently potentially unsafe - doesn't sanitize table or
+        column names - should be fixed once psycopg2 2.8 comes out
+        Args:
+            source_table (str): Name of table to copy from
+            target_table (str): Name of table to copy into
+            columns (list): List of column names
+            constraints (list): List of UNIQUE CONSTRAINT
+                columns in sql table
+        """
+        conn = self.pool.getconn()
+        return upsert_from_table(conn, source_table,
+                                 target_table, columns, constraints)
+
+    def df_upsert_psql(self, table: str, df: pd.DataFrame) -> None:
+        """ Upsert a Dataframe into a Postgres table through:
+        DataFrame -> StringIO -> Temp table -> table
+        Args:
+            table (str): Table to upsert data into
+            df (pd.DataFrame): Dataframe containing data to upsert from
+        """
+        conn = self.pool.getconn()
+        df_upsert_psql(conn, table, df)
 
 
 def try_sql(func: Callable[[Connection, Any], Any]) -> Callable:
@@ -67,11 +133,11 @@ def create_table_like(conn: Connection,
         None
     """
     cur = conn.cursor()
-    cmd = sql.SQL('CREATE TABLE {} (like {} '
-                  'INCLUDING DEFAULTS '
-                  'INCLUDING CONSTRAINTS '
-                  'INCLUDING INDEXES)').format(
-        sql.Identifier(new_table), sql.Identifier(existing_table))
+    cmd = (
+        'CREATE TABLE {} (like {} '
+        'INCLUDING DEFAULTS '
+        'INCLUDING CONSTRAINTS '
+        'INCLUDING INDEXES)').format(new_table, existing_table)
     cur.execute(cmd)
     cur.close()
     conn.commit()
@@ -85,14 +151,15 @@ def drop_table(conn: Connection, table: str):
         table (str): table name
     """
     cur = conn.cursor()
-    cmd = sql.SQL('DROP TABLE {}').format(sql.Identifier(table))
+    cmd = 'DROP TABLE {}'.format(table)
     cur.execute(cmd)
     cur.close()
 
 
 @try_sql
-def upsert_from_table(conn, source_table, target_table, columns,
-                      constraints=('userid', 'time')):
+def upsert_from_table(conn, source_table: str, target_table: str,
+                      columns: List[str],
+                      constraints: List[str] = ('userid', 'time')) -> None:
     """ Copy between tables and upsert all columns.
     Currently potentially unsafe - doesn't sanitize table or
     column names - should be fixed once psycopg2 2.8 comes out
@@ -103,8 +170,6 @@ def upsert_from_table(conn, source_table, target_table, columns,
         columns (list): List of column names
         constraints (list): List of UNIQUE CONSTRAINT
             columns in sql table
-    Returns:
-        None
     """
     columns = [c.lower() for c in columns if c not in ('userid', 'time')]
     cur = conn.cursor()
@@ -115,14 +180,6 @@ def upsert_from_table(conn, source_table, target_table, columns,
         ' DO UPDATE SET '
     )
     cmd_string += ', '.join(['{} = {}' for c in columns])
-    """  # Should work in psycopg2 2.8
-    cmd = sql.SQL(cmd_string).format(
-                  sql.Identifier(target_table), sql.Identifier(source_table),
-                  *[sql.Identifier(c) for c in constraints],
-                  *list(chain.from_iterable((
-                    (sql.Identifier(c), sql.Identifier('EXCLUDED', c))
-                    for c in columns))))
-    """
     cmd = cmd_string.format(
         target_table, source_table,
         *[c for c in constraints],
@@ -141,7 +198,7 @@ def df_upsert_psql(conn: Connection, table: str, df: pd.DataFrame) -> None:
     """
     columns = [df.index.name] + list(df.columns)
     curr_time = str(time.time()).replace('.', '_')
-    tmp_table = 'staging_' + table + '_' + curr_time
+    tmp_table = table + '_staging_' + curr_time
     create_table_like(conn, tmp_table, table)
     try:
         df_to_psql(conn, tmp_table, df)
@@ -150,7 +207,15 @@ def df_upsert_psql(conn: Connection, table: str, df: pd.DataFrame) -> None:
         drop_table(conn, tmp_table)
 
 
-def dask_upsert_psql(pool, table, ddf) -> None:
+def dask_upsert_psql(pool, table, ddf):
+    """ Upsert a dask dataframe into SQL table
+    Args:
+        pool: psycopg2 connection pool
+        table (str): table name
+        ddf (dask dataframe)
+    Returns:
+        Dask delayed object
+    """
     def upsert_with_pool(df):
         conn = pool.getconn()
         return df_upsert_psql(conn, table, df)
