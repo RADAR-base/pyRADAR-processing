@@ -116,7 +116,7 @@ def armt_read_csv_funcs(protocol) -> Dict[str, Callable]:
     out = {}
     for armt in protocol.values():
         name = armt.questionnaire.avsc + '_' + armt.questionnaire.name
-        out[name] = read_armt_csv
+        out[name] = read_armt_csv()
     return out
 
 
