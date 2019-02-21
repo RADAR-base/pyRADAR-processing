@@ -4,7 +4,7 @@ import numpy as np
 
 DAY = pd.Timedelta('1D')
 
-class RedcapCsv():
+class RedcapEpi():
     """ A class to parse information from an EPI Redcap CSV extract.
         The data dictionary can be found on the radar-base github.
     """

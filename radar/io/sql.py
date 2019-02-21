@@ -103,7 +103,7 @@ def try_sql(func: Callable[[Connection, Any], Any]) -> Callable:
 @try_sql
 def df_to_psql(conn: Connection, table: str, df: pd.DataFrame) -> None:
     """ Insert a pandas DataFrame into a Postgres table using a
-    StringIO intermediary CSV to COPY FRO
+    StringIO intermediary CSV to COPY FROM
     Args:
         conn: psycopg2 connection
         table (str): postgres table name
@@ -111,12 +111,19 @@ def df_to_psql(conn: Connection, table: str, df: pd.DataFrame) -> None:
     Returns:
         None
     """
+    def convert_types(df):
+        for col in df.columns:
+            if df[col].dtype == 'timedelta64[ns]':
+                df[col] = df[col].astype(int)
+        return df
+
+    df = convert_types(df)
     cur = conn.cursor()
     f = StringIO()
-    df.to_csv(f)
+    df.to_csv(f, na_rep='\\N', sep=';')
     f.seek(0)
-    cols = f.readline().strip().split(',')
-    cur.copy_from(f, table, sep=',', columns=cols)
+    cols = f.readline().strip().split(';')
+    cur.copy_from(f, table, sep=';', columns=cols)
     cur.close()
 
 
@@ -188,7 +195,8 @@ def upsert_from_table(conn, source_table: str, target_table: str,
     cur.execute(cmd)
 
 
-def df_upsert_psql(conn: Connection, table: str, df: pd.DataFrame) -> None:
+def df_upsert_psql(conn: Connection, table: str, df: pd.DataFrame,
+                   constraints: List[str] = ('userid', 'time')) -> None:
     """ Upsert a Dataframe into a Postgres table through:
     DataFrame -> StringIO -> Temp table -> table
     Args:
@@ -196,18 +204,21 @@ def df_upsert_psql(conn: Connection, table: str, df: pd.DataFrame) -> None:
         table (str): Table to upsert data into
         df (pd.DataFrame): Dataframe containing data to upsert from
     """
+    df = df.reset_index()\
+        .drop_duplicates(subset=constraints)\
+        .set_index(df.index.name)
     columns = [df.index.name] + list(df.columns)
     curr_time = str(time.time()).replace('.', '_')
     tmp_table = table + '_staging_' + curr_time
     create_table_like(conn, tmp_table, table)
     try:
         df_to_psql(conn, tmp_table, df)
-        upsert_from_table(conn, tmp_table, table, columns)
+        upsert_from_table(conn, tmp_table, table, columns, constraints)
     finally:
         drop_table(conn, tmp_table)
 
 
-def dask_upsert_psql(pool, table, ddf):
+def dask_upsert_psql(pool, table, ddf, constraints=('userid', 'time')):
     """ Upsert a dask dataframe into SQL table
     Args:
         pool: psycopg2 connection pool
@@ -218,5 +229,9 @@ def dask_upsert_psql(pool, table, ddf):
     """
     def upsert_with_pool(df):
         conn = pool.getconn()
-        return df_upsert_psql(conn, table, df)
-    return ddf.map_partitions(upsert_with_pool)
+        try:
+            df_upsert_psql(conn, table, df, constraints)
+        finally:
+            conn.close()
+            pool.putconn(conn)
+    return ddf.map_partitions(upsert_with_pool, meta=(None, None))

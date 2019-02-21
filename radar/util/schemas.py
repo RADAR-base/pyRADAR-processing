@@ -2,10 +2,8 @@
 import os
 import json
 import glob
-import requests
 import numpy as np
 import pandas as pd
-from ..common import log
 from ..defaults import config, schemas
 
 AVRO_NP_TYPES = {
@@ -21,6 +19,7 @@ AVRO_NP_TYPES = {
 }
 
 BLANK_KEY = {"namespace": "NoKey", "fields": []}
+
 
 class RadarSchema():
     """
@@ -43,13 +42,14 @@ class RadarSchema():
         """
         self.schema = schema_from_value_or_schema(schema_json, key_json)
 
-    def get_col_info(self, func=lambda x:x, *args):
+    def get_col_info(self, func=lambda x: x, *args):
         """
         Values from schema columns and their parent fields can be retrieved by
         a given function.
         """
-        return [func(col, field, *args) for field in self.schema['fields']
-                                        for col in field['type']['fields']]
+        return [func(col, field, *args)
+                for field in self.schema['fields']
+                for col in field['type']['fields']]
 
     def get_col_info_by_key(self, *keys):
         """
@@ -90,7 +90,6 @@ class RadarSchema():
         the schema
         """
         def convert_type(dtype):
-            # numpy arrays don't want union types.
             nptype = np.object
             if isinstance(dtype, list):
                 if 'null' in dtype:
@@ -100,28 +99,30 @@ class RadarSchema():
                         nptype = AVRO_NP_TYPES[dtype[0]]
                     elif dtype[0] in ('int', 'long'):
                         nptype = 'Int64'
-            elif isinstance(dtype, dict) and dtype['type'] == 'enum':
-                nptype = pd.api.types.CategoricalDtype(dtype['symbols'])
             elif isinstance(dtype, dict):
-                nptype = AVRO_NP_TYPES.get(dtype['type'], np.object)
+                if dtype['type'] == 'enum':
+                    nptype = pd.api.types.CategoricalDtype(dtype['symbols'])
+                else:
+                    nptype = AVRO_NP_TYPES.get(dtype['type'], np.object)
             else:
                 nptype = AVRO_NP_TYPES.get(dtype, np.object)
             return nptype
         return [convert_type(x) for x in self.get_col_types()]
 
     def dtype(self):
-        return {k:v for k,v in zip(self.get_col_names(),
-                                   self.get_col_py_types())}
+        return {k: v for k, v in
+                zip(self.get_col_names(), self.get_col_py_types())}
 
     def timecols(self):
-        return [name for name, doc in zip(self.get_col_names(),
-                                          self.get_col_info_by_key('doc'))
+        return [name for name, doc in
+                zip(self.get_col_names(), self.get_col_info_by_key('doc'))
                 if 'timestamp' in doc]
 
     def timedeltas(self):
-        return [name for name, doc in zip(self.get_col_names(),
-                                          self.get_col_info_by_key('doc'))
-                if 'duration' in doc]
+        return [name for name, doc in
+                zip(self.get_col_names(), self.get_col_info_by_key('doc'))
+                if 'duration' in doc.lower()]
+
 
 def schema_from_value_or_schema(schema_json, key_json=None):
     if schema_json['doc'] == 'combined key-value record':
@@ -131,6 +132,7 @@ def schema_from_value_or_schema(schema_json, key_json=None):
             key_json = BLANK_KEY
         schema = combine_key_value_schemas(key_json, schema_json)
     return schema
+
 
 def combine_key_value_schemas(key_json, value_json):
     """ Combined a RADAR key schema and a RADAR value schema.
@@ -146,8 +148,8 @@ def combine_key_value_schemas(key_json, value_json):
     schema_json = {
             'type': 'record',
             'name': value_json['name'],
-            'namespace' : '{}_{}'.format(key_json['namespace'],
-                                         value_json['namespace']),
+            'namespace': '{}_{}'.format(key_json['namespace'],
+                                        value_json['namespace']),
             'doc': 'combined key-value record',
             'fields': [
                     {'name': 'key',
@@ -159,6 +161,7 @@ def combine_key_value_schemas(key_json, value_json):
                 ],
             }
     return schema_json
+
 
 def schemas_from_commons(path, key_path=None):
     schema_paths = glob.glob(path + '/**/*.avsc', recursive=True)
@@ -175,6 +178,7 @@ def schemas_from_commons(path, key_path=None):
         schemas.append(schema_from_file(sp, key_path))
     return {name: scm for name, scm in zip(names, schemas)}
 
+
 def schema_from_file(path, key_path=None):
     with open(path) as vf:
         scm_json = json.loads(vf.read())
@@ -187,10 +191,11 @@ def schema_from_file(path, key_path=None):
 
 
 def schemas_from_git(path, key=None):
-    pass
+    raise NotImplementedError
+
 
 def schema_from_url(value_url, key_url=None):
-    pass
+    raise NotImplementedError
 
 
 if config.schema.dir:
