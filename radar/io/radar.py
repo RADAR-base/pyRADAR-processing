@@ -13,22 +13,12 @@ from ..util.armt import melt
 DT_MULT = int(1e9)
 
 
-def delayed_read(func, *args, **kwargs):
-    def read(path):
-        df = func(path, *args, **kwargs)
-        # temp workaround for fitbit sleep
-        if df.divisions == (None, None):
-            df.divisions = (df.index.head()[0], df.tail().index[-1])
-        return df
-    return read
-
-
 def file_datehour(fn):
     return pd.Timestamp(fn.split('/')[-1][0:13]
                         .replace('_', 'T')).tz_localize('UTC')
 
 
-def read_csv_func(func):
+def read_csv_folder(func):
     @wraps(func)
     def wrapper(path, *args, **kwargs):
         files = glob.glob(path + '/*.csv*')
@@ -38,15 +28,17 @@ def read_csv_func(func):
                         [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
         except ValueError:
             divisions = None
-        delayed_files = [delayed(func(*args, **kwargs))(fn)
+        delayed_files = [delayed(func)(fn, *args, **kwargs)
                          for fn in files]
-        return dd.from_delayed(delayed_files, divisions=divisions)
+        df = dd.from_delayed(delayed_files, divisions=divisions)
+        if df.divisions == (None, None):
+            df.divisions = (df.index.head()[0], df.tail().index[-1])
+        return df
     return wrapper
 
 
-@read_csv_func
 def read_prmt_csv(dtype=None, timecols=None,
-                  timedeltas=None, index=config.io.index):
+                  timedeltas=None, index=config['io']['index']):
     if dtype is None:
         dtype = {}
     if timecols is None:
@@ -55,6 +47,7 @@ def read_prmt_csv(dtype=None, timecols=None,
         timedeltas = {}
     dtype['key.projectId'] = object
 
+    @read_csv_folder
     def read_csv(path, *args, **kwargs):
         df = pd.read_csv(path, *args, dtype=dtype, **kwargs)
         for col in timecols:
@@ -73,12 +66,13 @@ def read_prmt_csv(dtype=None, timecols=None,
         if index:
             df = df.set_index(index)
             df = df.sort_index()
+        print(df.head())
         return df
     return read_csv
 
 
-@read_csv_func
-def read_armt_csv(index=config.io.index):
+def read_armt_csv(index=config['io']['index']):
+    @read_csv_folder
     def read_csv(path, *args, **kwargs):
         df = pd.read_csv(path, dtype=object, *args, **kwargs)
         df = df.drop_duplicates('value.time')
@@ -113,17 +107,15 @@ def schema_read_csv_funcs(schemas):
     """
     out = {}
     for name, scm in schemas.items():
-        out[name] = delayed_read(read_prmt_csv, scm.dtype(), scm.timecols())
+        out[name] = read_prmt_csv(scm.dtype(), scm.timecols())
     return out
 
 
 def armt_read_csv_funcs(protocol) -> Dict[str, Callable]:
-    """  asd
-    """
     out = {}
     for armt in protocol.values():
         name = armt.questionnaire.avsc + '_' + armt.questionnaire.name
-        out[name] = delayed_read(read_armt_csv)
+        out[name] = read_armt_csv
     return out
 
 
@@ -135,6 +127,7 @@ if config['protocol']['url'] or config['protocol']['file']:
     from ..util import protocol as _protocol
     _data_load_funcs.update(armt_read_csv_funcs(_protocol.protocols))
 
+"""
 # Fitbit temp
 _data_load_funcs['connect_fitbit_intraday_steps'] = \
         delayed_read(read_prmt_csv,
@@ -157,3 +150,15 @@ _data_load_funcs['connect_fitbit_sleep_classic'] = delayed_read(
     timecols=['value.dateTime', 'value.timeReceived'],
     timedeltas={'value.duration': 'timedelta64[s]'},
     index='dateTime')
+
+
+_data_load_funcs['connect_fitbit_time_zone'] = delayed_read(
+    read_prmt_csv,
+    timecols=['value.timeReceived'],
+    index='timeReceived')
+
+
+_data_load_funcs['android_processed_audio'] = delayed_read(
+    lambda x: read_prmt_csv(x),
+    timecols=['value.time', 'value.timeReceived'])
+    """
