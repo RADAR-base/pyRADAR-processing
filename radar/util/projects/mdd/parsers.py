@@ -65,7 +65,7 @@ class RedcapMDD():
             Return labels as a dict with [subject_id][label_name] = df
             Defaults to True. If False, returns a full dataframe with every ptc
         """
-        df = pd.read_csv(csv_path, sep=None)
+        df = pd.read_csv(csv_path, sep=None, engine='python')
         self.id_cols = ['subject_id', 'record_id']
         for c in ['subject_id', 'human_readable_id']:
             df[c].fillna(method='ffill', inplace=True)

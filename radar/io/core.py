@@ -45,6 +45,3 @@ def get_fs(protocol, **storage_options):
     fs = cls(**storage_options)
     return fs
 
-def read_csv():
-
-    pass

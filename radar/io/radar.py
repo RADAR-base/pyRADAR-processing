@@ -164,11 +164,14 @@ def read_processed_audio():
 
     def read_csv(path, *args, **kwargs):
         df = delayed_read(path, *args, **kwargs)
+        df = df.dropna()
         df['data'] = df['data'].map_partitions(
              convert_data_delayed, meta=('data', object))
         return df
 
-    delayed_read = read_prmt_csv(timecols=['value.time', 'value.timeReceived'])
+    delayed_read = read_prmt_csv(timecols=['value.time', 'value.timeReceived'],
+                                 dtype={'value.data': object})
     return read_csv
+
 
 _data_load_funcs['android_processed_audio'] = read_processed_audio()
