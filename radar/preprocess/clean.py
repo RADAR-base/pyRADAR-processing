@@ -20,7 +20,7 @@ def validate(validator):
     """ Wraps function to run a validator on dataframe input
     """
     def decorator(func):
-        @wraps
+        @wraps(func)
         def wrap(df, *args, **kwargs):
             df = df[validator(df)]
             return func(df, *args, **kwargs)
@@ -45,9 +45,9 @@ def android_phone_contacts(df: pd.DataFrame) -> pd.DataFrame:
         'sourceId': last,
         'userId': last,
         'timeReceived': last,
-        'contacts': np.median,
         'contactsAdded': sum,
-        'contactsRemoved': sum})
+        'contactsRemoved': sum,
+        'contacts': np.median})
 
 
 @validate(validators.questionnaire_phq8)

@@ -193,7 +193,9 @@ class ManagementPortal():
 
     def __init__(self, client_id, client_secret, url):
         self._url = url.rstrip('/')
-        self.authenticate(client_id, client_secret)
+        self.s = requests.Session()
+        self.s.headers['Authorization'] = \
+            'Bearer {}'.format(self.authenticate(client_id, client_secret))
         self.subjects = Subject(portal=self)
         self.projects = Project(portal=self)
         self.source = Source(portal=self)
@@ -210,14 +212,11 @@ class ManagementPortal():
         client = BackendApplicationClient(client_id=client_id)
         oauth = OAuth2Session(client=client)
         token = get_token(client_id, client_secret, oauth, self._url)
-        self._headers = {
-            'Authorization': 'Bearer {}'.format(token['access_token'])
-        }
-        return token
+        return token['access_token']
 
     def request(self, method, endpoint, **kwargs):
         url = self._url + '/api/' + endpoint
-        r = requests.request(method, url, headers=self._headers, **kwargs)
+        r = self.s.request(method, url, **kwargs)
         if (r.status_code == 401 and 'error_description' in r.json() and
                 'Access token expired' in r.json()['error_description']):
             err = ('401 Client Error: Access token has expired')
