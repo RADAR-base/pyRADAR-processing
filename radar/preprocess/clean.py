@@ -42,8 +42,8 @@ def android_phone_contacts(df: pd.DataFrame) -> pd.DataFrame:
     df = df[validators.android_phone_contacts(df)]
     return df.groupby(df.index.floor('1D')).agg({
         'projectId': last,
-        'sourceId': last,
         'userId': last,
+        'sourceId': last,
         'timeReceived': last,
         'contactsAdded': sum,
         'contactsRemoved': sum,
