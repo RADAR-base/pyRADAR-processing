@@ -47,7 +47,7 @@ def android_phone_contacts(df: pd.DataFrame) -> pd.DataFrame:
         'timeReceived': last,
         'contactsAdded': sum,
         'contactsRemoved': sum,
-        'contacts': np.median})
+        'contacts': lambda x: np.median(x).astype(df['contacts'].dtype)})
 
 
 @validate(validators.questionnaire_phq8)
