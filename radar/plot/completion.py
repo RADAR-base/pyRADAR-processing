@@ -23,11 +23,18 @@ def completion_plot(completion, modalities, start, end, freq,
     ax: matplotlib axes
     cmap: Colormap
     x_tick_mult: int
+        Multiplier for x ticks, will draw a tick every x_tick_mult hours.
     x_tick_fmt: str
     enrolment_date: pd.Timedelta / np.datetime64
     events: list of tuples of strings
         A list of event timestamp and label pairs, both as strings
+        Draws a vertical line at each event, colored as:
+            green: data from all modalities is present at the event
+            orange: data from at least one modality is present at the event
+            red: no data is present at the event
+        If event_radius is specified the color checks include the whole event circumference.
     event_radius: float
+        Radius around each event in multiples of freq
 
     Returns
     _______
@@ -57,27 +64,25 @@ def completion_plot(completion, modalities, start, end, freq,
                 # TODO: review usage of tz_localize()
                 e_stamp = pd.Timestamp(datetime.strptime(e_stamp_str, '%Y-%m-%d %H:%M:%S')).tz_localize('CET').tz_convert('UTC')
 
-            if e_stamp > start and e_stamp < end:
-                log.debug("Event at {}: {}".format(e_stamp, e_label))
-                e_idx = (e_stamp - start)//td
+            if e_stamp < start or e_stamp > end: continue
 
-                e_slice = None
-                if event_radius:
-                    e_start = max(0, (e_stamp - start - (td * event_radius))//td)
-                    e_end = min(N_x-1, (e_stamp - start + (td * event_radius))//td)
-                    e_slice = slice(e_start, e_end+1)
-                    rect = patches.Rectangle((e_start, 0), e_end - e_start, N_y, linewidth=0.5, edgecolor='k', alpha=0.25, zorder=9)
-                    ax.add_patch(rect)
+            log.debug("Event at {}: {}".format(e_stamp, e_label))
+            e_idx = (e_stamp - start)//td
 
-                has_all = completion_idx_has_data(completion, e_slice if e_slice else e_idx, requirement_function=all)
-                has_any = completion_idx_has_data(completion, e_slice if e_slice else e_idx, requirement_function=any)
+            e_slice = None
+            if event_radius:
+                e_start = max(0, (e_stamp - start - (td * event_radius))//td)
+                e_end = min(N_x-1, (e_stamp - start + (td * event_radius))//td)
+                e_slice = slice(e_start, e_end+1)
+                rect = patches.Rectangle((e_start, 0), e_end - e_start, N_y, linewidth=0.5, edgecolor='k', alpha=0.25, zorder=9)
+                ax.add_patch(rect)
 
-                if has_all:
-                    ax.vlines(e_idx, 0, N_y, color='green', linewidth=2, zorder=10)
-                elif has_any:
-                    ax.vlines(e_idx, 0, N_y, color='orange', linewidth=2, zorder=10)
-                else:
-                    ax.vlines(e_idx, 0, N_y, color='red', linewidth=2, zorder=10)
+            has_all = completion_idx_has_data(completion, e_slice if e_slice else e_idx, requirement_function=all)
+            has_any = completion_idx_has_data(completion, e_slice if e_slice else e_idx, requirement_function=any)
+
+            if has_all: ax.vlines(e_idx, 0, N_y, color='green', linewidth=2, zorder=10)
+            elif has_any: ax.vlines(e_idx, 0, N_y, color='orange', linewidth=2, zorder=10)
+            else: ax.vlines(e_idx, 0, N_y, color='red', linewidth=2, zorder=10)
 
     # Enrolment
     if enrolment_date:

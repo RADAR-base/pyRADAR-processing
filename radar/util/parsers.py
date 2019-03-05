@@ -6,3 +6,13 @@ def biovotion_sort_upsample(df, time_idx='value.time'):
     df[time_idx] = (df[time_idx].astype(int) +
                     deltas.dot(10**9).astype(int)).astype(np.datetime64)
     return df
+
+
+def timestamp_from_string(stampstr, fromtz='CET', totz='UTC'):
+    import pandas as pd
+    from datetime import datetime
+    try:
+        sz_unix = float(stampstr)
+        return pd.Timestamp(sz_unix, unit='s').tz_localize('UTC').tz_convert(totz)
+    except:
+        return pd.Timestamp(datetime.strptime(stampstr, '%Y-%m-%d %H:%M:%S')).tz_localize(fromtz).tz_convert(totz)
