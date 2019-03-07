@@ -58,8 +58,7 @@ def add_file_log(logger: logging.Logger,
 
 
 log = logging.getLogger('radarlog')
-formatter = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter(config.log.format)
 add_cli_log(log, formatter)
-if config['log_to_file']:
+if config.log.to_file:
     add_file_log(log, formatter)
