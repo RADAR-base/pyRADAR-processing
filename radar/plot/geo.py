@@ -20,7 +20,7 @@ except ModuleNotFoundError:
 
 
 def geo_scatter(latitudes, longitudes, projection=None,
-                tiler=Stamen('terrain-background'), zoom_level=8,
+                tiler=Stamen('toner-background'), zoom_level=8,
                 extent=None, alpha=0.3, ax=None, fig=None, **kwargs):
     """ Latitude / longitude scatter plot
     Parameters:
@@ -59,7 +59,7 @@ def geo_scatter(latitudes, longitudes, projection=None,
 
 
 def geo_heatmap(latitudes, longitudes, projection=None,
-                tiler=Stamen('toner-lite'), zoom_level=8,
+                tiler=Stamen('toner-background'), zoom_level=8,
                 extent=None, bins=40, ax=None, fig=None, **kwargs):
     """ Latitude / longitude heatmap
     Parameters:
@@ -76,10 +76,10 @@ def geo_heatmap(latitudes, longitudes, projection=None,
     Returns:
         matplotlib.figure.Figure
     """
-    cmap = mpl.cm.Greens
+    cmap = mpl.cm.Reds
     n = cmap.N
     cmap = cmap(np.arange(n))
-    cmap[:, -1] = np.linspace(0.4, 0.9, n)
+    cmap[:, -1] = np.linspace(0.7, 0.99, n)
     cmap[0, -1] = 0
     cmap = mpl.colors.ListedColormap(cmap)
     if projection is None:
@@ -108,7 +108,7 @@ def geo_heatmap(latitudes, longitudes, projection=None,
 
 
 def geo_hexmap(latitudes, longitudes, projection=None,
-               tiler=Stamen('toner-lite'), zoom_level=8,
+               tiler=Stamen('toner-background'), zoom_level=8,
                extent=None, gridsize=30, ax=None, fig=None, **kwargs):
     """ Latitude / longitude hexmap
     Parameters:
@@ -125,10 +125,10 @@ def geo_hexmap(latitudes, longitudes, projection=None,
     Returns:
         matplotlib.figure.Figure
     """
-    cmap = mpl.cm.Greens
+    cmap = mpl.cm.Reds
     n = cmap.N
     cmap = cmap(np.arange(n))
-    cmap[:, -1] = np.linspace(0.4, 0.9, n)
+    cmap[:, -1] = np.linspace(0.7, 0.99, n)
     cmap[0, -1] = 0
     cmap = mpl.colors.ListedColormap(cmap)
     if projection is None:
