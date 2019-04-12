@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+from functools import lru_cache
 import pandas as pd
 import numpy as np
 from ....generic import update
+
 
 INFO = (('study',
             ['study',
@@ -50,33 +52,24 @@ class RedcapMDD():
     A class to parse information from an EPI Redcap CSV extract.
     The data dictionary can be found on the radar-base github.
     """
-    def __init__(self, csv_path, timezone=None,
-                 id_cols=None, labels_as_dict=True):
+    def __init__(self, csv_path, timezone=None):
         """
-        Parameters
-        _________
-        csv_path : str
-            path of the RedCap csv extract file
-        timezone : str / tz representation
-            The timezone that was used to record datetimes
-        id_cols : list
-            A list of id columns
-        labels_as_dict : bool
-            Return labels as a dict with [subject_id][label_name] = df
-            Defaults to True. If False, returns a full dataframe with every ptc
+        Params:
+            csv_path (str): path of the RedCap csv extract file
+            timezone (str): The timezone that was used to record datetimes
         """
         df = pd.read_csv(csv_path, sep=None, engine='python')
-        self.id_cols = ['subject_id', 'record_id']
+        self._id_cols = ['subject_id', 'record_id']
         for c in ['subject_id', 'human_readable_id']:
             df[c].fillna(method='ffill', inplace=True)
         for c in df.columns:
             if 'timestamp' in c:
-                df[c] = pd.to_datetime(df[c], errors='coerce').dt.tz_localize(timezone)
+                df[c] = (pd.to_datetime(df[c], errors='coerce')
+                         .dt.tz_localize(timezone))
         df['enrolment_date'] = pd.to_datetime(df['enrolment_date'])
         df['enrolment_date'] = df['enrolment_date'].dt.tz_localize(timezone)
         self.df = df
         self.tz = timezone
-        self.labels_as_dict = labels_as_dict
 
     def _subset(self, columns):
         id_cols = ['subject_id', 'record_id']
@@ -86,20 +79,8 @@ class RedcapMDD():
             out.insert(0, c, self.df[c].copy())
         return out
 
-    def _to_labels(name):
-        def decorator(func):
-            def wrapper(*args, **kwargs):
-                out = func(*args, **kwargs)
-                if not args[0].labels_as_dict:
-                    return out
-                labels = {}
-                for sid, df in out.groupby('subject_id'):
-                    labels[sid] = {}
-                    labels[sid][name] = df.copy().reset_index(drop=True)
-                return labels
-            return wrapper
-        return decorator
-
+    @property
+    @lru_cache(1)
     def ids_sr(self):
         cols = [c for c in self.df.columns if
                 c[:4] == 'ids_' and c[4].isnumeric()]
@@ -107,32 +88,8 @@ class RedcapMDD():
                      'ids_sr' in c])
         return self._subset(cols)
 
-    @_to_labels('IDS_SR')
-    def ids_sr_score(self, *args, **kwargs):
-        ids_sr = self.ids_sr(*args, **kwargs)
-        ids_sr['ids_sr_score'] = _ids_sr_score(ids_sr)
-        ids_sr['ids_sr_severity'] = ids_sr['ids_sr_score'].map(_ids_sr_severity)
-        return ids_sr
-
-    def all_labels(self):
-        label_func_names = ['ids_sr_score']
-        labels = [self.__getattribute__(l)() for l in label_func_names]
-        if isinstance(labels[0], dict):
-            return self._all_labels_dict(labels)
-        else:
-            return self._all_labels_df(labels)
-
-    @staticmethod
-    def _all_labels_dict(labels):
-        out = labels.pop()
-        for l in labels:
-            update(out, l)
-        return out
-
-    @staticmethod
-    def _all_labels_df(labels):
-        return pd.concat(labels)
-
+    @property
+    @lru_cache(1)
     def info(self):
         info = {}
         df = self.df.drop_duplicates('record_id', keep='first')
@@ -143,28 +100,6 @@ class RedcapMDD():
                 info[sid][cat] = r.iloc[0][fields].to_dict()
         return info
 
-
-def _ids_sr_score(df):
-    """ Scores a IDS-SR dataframe with column ids as in redcap
-    Parameters
-    __________
-    df : pd.DataFrame
-
-    Returns
-    _______
-    score : np.ndarray
-    """
-    scoring_cols = [c for c in df.columns if
-                    c[:4] == 'ids_' and c[4:].isnumeric()]
-    max_cols = (('ids_11', 'ids_12'),
-                ('ids_13', 'ids_14'))
-    sum_cols = [c for c in scoring_cols if c not in
-                ['ids_11', 'ids_12', 'ids_13', 'ids_14']]
-    score = np.zeros(len(df))
-    for cols in max_cols:
-        score += df.loc[:, cols].max(axis=1).fillna(0)
-    score += df[sum_cols].sum(axis=1)
-    return score
 
 def _ids_sr_severity(score):
     """Returns a depression severity from a IDS_SR score.
