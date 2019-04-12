@@ -90,7 +90,7 @@ class Imec(dict):
             chunk_array = np.zeros(1 + len(arrs[i].chunks[0]))
             chunk_array[1:] = np.cumsum(arrs[i].chunks[0])
             divs.extend(arr[chunk_array])
-        divs.append(arr[len(arr) - 1])
+        divs.append(arr[len(arr) - 1][0])
         return {'timecol': da.concatenate(arrs, axis=0),
                 'divs': divs}
 
