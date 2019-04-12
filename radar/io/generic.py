@@ -200,8 +200,6 @@ def get_data_func(name, ext, compression, isfile):
     return func
 
 
-idx_error = ('only integers, slices (`:`), ellipsis (`...`),',
-             ' and integer or boolean arrays are valid indices')
 class FakeDatetimeArray(object):
     def __init__(self, start, length, freq=None, step=None):
         """
@@ -224,6 +222,8 @@ class FakeDatetimeArray(object):
         self.dtype = np.dtype('datetime64[ns]')
 
     def __getitem__(self, x):
+        idx_error = ('only integers, slices (`:`), ellipsis (`...`),',
+                     ' and integer or boolean arrays are valid indices')
         if isinstance(x, tuple):
             x = x[0]
         arr = None
@@ -250,7 +250,7 @@ class FakeDatetimeArray(object):
             raise IndexError(idx_error)
         arr = arr[arr >= 0]
         arr = arr[arr < self.length]
-        return (self.start + (arr * self.step)).astype('datetime64[ns]')
+        return pd.DatetimeIndex(((self.start + (arr * self.step)).astype('datetime64[ns]')))
 
     def __len__(self):
         return self.length
