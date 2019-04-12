@@ -111,13 +111,6 @@ def df_to_psql(conn: Connection, table: str, df: pd.DataFrame) -> None:
     Returns:
         None
     """
-    def convert_types(df):
-        for col in df.columns:
-            if df[col].dtype == 'timedelta64[ns]':
-                df[col] = df[col].astype(int)
-        return df
-
-    df = convert_types(df)
     cur = conn.cursor()
     f = StringIO()
     df.to_csv(f, na_rep='\\N', sep=';')
