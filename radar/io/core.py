@@ -3,6 +3,7 @@ import pandas as pd
 from functools import lru_cache
 from dask.utils import import_required
 from dask.bytes.core import _filesystems, get_fs_token_paths
+from dask.bytes.utils import infer_storage_options
 from .fs import LocalFileSystem
 
 _filesystems['file'] = LocalFileSystem
@@ -45,3 +46,9 @@ def get_fs(protocol, **storage_options):
     fs = cls(**storage_options)
     return fs
 
+
+def glob_path_for_files(path, file_extension):
+    fs = get_fs(**infer_storage_options(path))
+    if fs.isfile(path):
+        return [path]
+    return fs.glob(path + fs.sep + file_extension)

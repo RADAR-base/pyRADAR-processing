@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import dask.delayed as delayed
 import dask.dataframe as dd
+from .core import glob_path_for_files
 from .generic import _data_load_funcs
 from ..common import config
 from ..util.armt import melt
@@ -16,14 +17,37 @@ DT_MULT = int(1e9)
 
 
 def file_datehour(fn):
-    return pd.Timestamp(fn.split('/')[-1][0:13]
-                        .replace('_', 'T')).tz_localize('UTC')
+    """ Converts the RADAR CSV output filename to a Timestamp
+    Params:
+        fn (str): The filename
+    Returns:
+        pd.Timestamp
+    """
+    return pd.Timestamp(fn.split('/')[-1][0:13].replace('_', 'T'),
+                        tz='UTC')
+
+
+def is_numeric(series):
+    """ Checks whether pandas series dtype is a float or integer.
+    Params:
+        series (pd.Series): Pandas series to check
+    Returns:
+        bool
+    """
+    return series.dtype == 'float' or series.dtype == 'int'
+
+
+def convert_to_datetime(series):
+    if is_numeric(series):
+        return pd.DatetimeIndex(DT_MULT * series, tz='UTC')
+    return pd.DatetimeIndex(pd.to_datetime(series))
+
 
 
 def read_csv_folder(func):
     @wraps(func)
     def wrapper(path, *args, **kwargs):
-        files = glob.glob(path + '/*.csv*')
+        files = glob_path_for_files(path, '*.csv*')
         files.sort()
         try:
             divisions = [file_datehour(fn) for fn in files] +\
@@ -40,31 +64,31 @@ def read_csv_folder(func):
 
 
 def read_prmt_csv(dtype=None, timecols=None,
-                  timedeltas=None, index=config['io']['index']):
+                  timedeltas=None, index=config['io']['index'],
+                  drop_duplicates=True, drop_unspecified=True,
+                  rename_columns=True):
     if dtype is None:
         dtype = {}
     if timecols is None:
         timecols = []
     if timedeltas is None:
         timedeltas = {}
-    dtype['key.projectId'] = object
 
     @read_csv_folder
     def read_csv(path, *args, **kwargs):
         df = pd.read_csv(path, *args, dtype=dtype, **kwargs)
-        for col in timecols:
-            if df[col].dtype == 'int' or df[col].dtype == 'float':
-                df[col] = pd.DatetimeIndex(
-                    (DT_MULT * df[col].values).astype('Int64'),
-                    tz='UTC')
-            else:
-                df[col] = pd.DatetimeIndex(pd.to_datetime(df[col]))
-
+        df.loc[:, timecols] = df[timecols].apply(convert_to_datetime)
         for col, deltaunit in timedeltas.items():
             df[col] = df[col].astype('Int64').astype(deltaunit)
 
-        df.columns = [c.split('.')[-1] for c in df.columns]
-        df = df.drop_duplicates(index)
+        if drop_unspecified:
+            extracols = [c for c in df.columns
+                         if c not in dtype and c[:3] != 'key']
+            df = df.drop(columns=extracols)
+        if rename_columns:
+            df.columns = [c.split('.')[-1] for c in df.columns]
+        if drop_duplicates:
+            df = df.drop_duplicates(index)
         if index:
             df = df.set_index(index)
             df = df.sort_index()
@@ -131,25 +155,53 @@ if config['protocol']['url'] or config['protocol']['file']:
 
 # Fitbit temp
 _data_load_funcs['connect_fitbit_intraday_steps'] = read_prmt_csv(
-                     timecols=['value.time', 'value.timeReceived'],
-                     timedeltas={'value.timeInterval': 'timedelta64[s]'})
+    dtype={
+        'value.time': float,
+        'value.timeReceived': float,
+        'value.timeInterval': int,
+        'value.steps': int
+    },
+    timecols=['value.time', 'value.timeReceived'],
+    timedeltas={'value.timeInterval': 'timedelta64[s]'})
 
 _data_load_funcs['connect_fitbit_intraday_heart_rate'] = read_prmt_csv(
-                     timecols=['value.time', 'value.timeReceived'],
-                     timedeltas={'value.timeInterval': 'timedelta64[s]'})
+    dtype={
+        'value.time': float,
+        'value.timeReceived': float,
+        'value.timeInterval': int,
+        'value.heartRate': int
+    },
+    timecols=['value.time', 'value.timeReceived'],
+    timedeltas={'value.timeInterval': 'timedelta64[s]'})
 
 _data_load_funcs['connect_fitbit_sleep_stages'] = read_prmt_csv(
+    dtype={
+        'value.dateTime': object,
+        'value.timeReceived': float,
+        'value.duration': int,
+        'value.level': object
+    },
     timecols=['value.dateTime', 'value.timeReceived'],
     timedeltas={'value.duration': 'timedelta64[s]'},
     index='dateTime')
 
 _data_load_funcs['connect_fitbit_sleep_classic'] = read_prmt_csv(
+    dtype={
+        'value.dateTime': object,
+        'value.timeReceived': float,
+        'value.duration': int,
+        'value.level': object
+    },
     timecols=['value.dateTime', 'value.timeReceived'],
     timedeltas={'value.duration': 'timedelta64[s]'},
     index='dateTime')
 
 
 _data_load_funcs['connect_fitbit_time_zone'] = read_prmt_csv(
+    dtype={
+        'value.timeReceived': float,
+        'value.timeZoneOffset': int
+    },
     timecols=['value.timeReceived'],
     index='timeReceived')
 

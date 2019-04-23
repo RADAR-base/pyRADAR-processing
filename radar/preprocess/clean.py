@@ -39,15 +39,18 @@ def android_phone_contacts(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: daily aggregate of phone_contacts
     """
+    aggregations = {}
+
+    for col in df.columns:
+        if col not in aggregations:
+            aggregations[col] = last
+
+    aggregations['contactsAdded']: sum
+    aggregations['contactsRemoved']: sum
+    aggregations['contacts']: lambda x: np.median(x).astype(df['contacts'].dtype)
+
     df = df[validators.android_phone_contacts(df)]
-    return df.groupby(df.index.floor('1D')).agg({
-        'projectId': last,
-        'userId': last,
-        'sourceId': last,
-        'timeReceived': last,
-        'contactsAdded': sum,
-        'contactsRemoved': sum,
-        'contacts': lambda x: np.median(x).astype(df['contacts'].dtype)})
+    return df.groupby(df.index.floor('1D')).agg(aggregations)
 
 
 @validate(validators.questionnaire_phq8)

@@ -41,10 +41,10 @@ def search_project_dir(path, subprojects=None, participants=None,
 
     sp = out_paths(path, fs.sep, folders,
                    whitelist=subprojects if subprojects else [],
-                   blacklist = blacklist)
+                   blacklist=blacklist)
     ptc = out_paths(path, fs.sep, folders,
-                    whitelist = participants,
-                    blacklist = subprojects + blacklist)
+                    whitelist=participants,
+                    blacklist=subprojects + blacklist)
 
     return {'subprojects': sp,
             'participants': ptc}
@@ -91,13 +91,14 @@ def infer_data_format(f, include='.*', exclude='.*schema.*json'):
 
     if config.schema.from_local_file:
         schema_regex = re_compile(config.schema.local_file_regex)
-        schema_files = [ f + '/' + x for x in fs.list_files(f) if schema_regex.match(x) ]
+        schema_files = [f + '/' + x for x in fs.list_files(f)
+                        if schema_regex.match(x)]
         if len(schema_files) > 0:
             from ..util.schemas import schema_from_file
             from .radar import schema_read_csv_funcs # TODO: make this generic and not just for radar data?
             schema = schema_from_file(schema_files[0])
             schema_read_csv_funcs({name: schema})
-            log.debug("Loaded schema from local file {}".format( schema_files[0]))
+            log.debug("Loaded schema from local file {}".format(schema_files[0]))
 
     isfile = fs.isfile(f)
     if isfile:
@@ -121,7 +122,7 @@ def search_dir_for_data(path, **kwargs):
     paths = listdir(path, blacklist=blacklist,
                     whitelist=kwargs.get('whitelist', None),
                     include=kwargs.get('include', None),
-                    exclude = kwargs.get('exclude', None))
+                    exclude=kwargs.get('exclude', None))
     for sd in subdirs:
         subpath = path.rstrip(fs.sep) + fs.sep + sd
         if fs.isdir(subpath):
@@ -136,12 +137,15 @@ def search_dir_for_data(path, **kwargs):
             out[name] = p
     return out
 
-# Data loading
+# Data loading
 def load_data_path(path, **kwargs):
     func = get_data_func(*infer_data_format(path))
     return func(path, **kwargs)
 
+
 _data_load_funcs = {}
+
+
 def get_data_func(name, ext, compression, isfile):
     func = None
     ext_comp = (ext, compression)
@@ -159,35 +163,20 @@ def get_data_func(name, ext, compression, isfile):
         func = Imec
 
     if ext == 'csv':
-        if compression:
-            func = lambda path, *args, **kwargs: \
-                    dd.read_csv(path + '/*.csv.*',
-                                compression=compression, blocksize=None,
-                                *args, **kwargs)
-        else:
-            func = lambda path, *args, **kwargs: \
-                    dd.read_csv(path + '/*.csv',
-                                *args, **kwargs)
+        func = lambda path, *args, **kwargs: \
+                dd.read_csv(path if isfile else path + '/*.csv*',
+                            compression=compression, blocksize=None,
+                            *args, **kwargs)
     elif ext == 'tsv':
-        if compression:
-            func = lambda path, *args, **kwargs: \
-                    dd.read_tsv(path + '/*.tsv.*',
-                                compression=compression, blocksize=None,
-                                *args, **kwargs)
-        else:
-            func = lambda path, *args, **kwargs: \
-                    dd.read_tsv(path + '/*.tsv',
-                                *args, **kwargs)
+        func = lambda path, *args, **kwargs: \
+                dd.read_tsv(path if isfile else path + '/*.tsv*',
+                            compression=compression, blocksize=None,
+                            *args, **kwargs)
     elif ext == 'json':
-        if compression:
-            func = lambda path, *args, **kwargs: \
-                    dd.read_json(path + '/*.json.*',
-                                compression=compression, blocksize=None,
-                                *args, **kwargs)
-        else:
-            func = lambda path, *args, **kwargs: \
-                    dd.read_json(path + '/*.json',
-                                *args, **kwargs)
+        func = lambda path, *args, **kwargs: \
+                dd.read_json(path if isfile else path + '/*.json*',
+                             compression=compression, blocksize=None,
+                             *args, **kwargs)
     elif ext == 'parquet' or ext == 'pq':
         func = dd.read_parquet
     elif ext == 'orc':
