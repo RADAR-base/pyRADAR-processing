@@ -120,14 +120,12 @@ def correct_drift(df, fits, inplace=True):
         start = fits.index[i] - 0.1*SEC
         stop = fits.index[i+1]
         p = fits.iloc[i]['fit']
-        new_time[start:stop] += p(new_time[start:stop].index\
-                .astype('int64'))\
-                .astype('timedelta64[ns]')
+        new_time[start:stop] += p(new_time[start:stop].index.astype('int64'))\
+            .astype('timedelta64[ns]')
     start = fits.index[-1]
     p = fits.iloc[-1]['fit']
-    new_time[start:] += p(new_time[start:].index\
-            .astype('int64'))\
-            .astype('timedelta64[ns]')
+    new_time[start:] += p(new_time[start:].index.astype('int64'))\
+        .astype('timedelta64[ns]')
     df.index = new_time.values
     df.index = df.index.tz_localize(tz)
     return
