@@ -3,7 +3,7 @@ import re
 import numpy as np
 import pandas as pd
 import dask.dataframe as dd
-from functools import lru_cache
+from functools import lru_cache, partial
 from collections import Counter
 from dask.bytes.utils import infer_compression, infer_storage_options
 from ..common import log, config
@@ -178,7 +178,7 @@ def get_data_func(name, ext, compression, isfile):
                              compression=compression, blocksize=None,
                              *args, **kwargs)
     elif ext == 'parquet' or ext == 'pq':
-        func = dd.read_parquet
+        func = partial(dd.read_parquet, engine='pyarrow')
     elif ext == 'orc':
         func = dd.read_orc
     if func is None:
