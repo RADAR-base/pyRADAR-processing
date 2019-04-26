@@ -173,6 +173,7 @@ class Protocol(object):
         return pd.DataFrame(data={'time': expected_times.tz_convert(None).values,
                                   'questions_completed': intervals})
 
+
 def from_url(url):
     r = requests.get(url)
     r.raise_for_status()
@@ -180,14 +181,15 @@ def from_url(url):
     protocols = {p['name']: Protocol(p) for p in protocols['protocols']}
     return protocols
 
+
 def from_path(path):
     with open(path, 'r') as f:
         protocols_file = json.load(f)
     protocols = {p['name']: Protocol(p) for p in protocols['protocols']}
     return protocols
 
+
 if config.protocol.path:
     protocols.update(from_path(config.protocol.path))
 elif config.protocol.url:
     protocols.update(from_url(config.protocol.url))
-
