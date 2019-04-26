@@ -55,6 +55,7 @@ def search_project_dir(path, subprojects=None, participants=None,
 def re_compile(pattern):
     return re.compile(pattern)
 
+
 def infer_data_format(f, include='.*', exclude='.*schema.*json'):
     def infer_file_format(f):
         comp = infer_compression(f)
@@ -112,6 +113,7 @@ COMBI_DATA = {'IMEC': ('imec_acceleration', 'imec_gsr',
                        'imec_ecg', 'imec_emg',
                        'imec_temperature', 'imec_pie')}
 
+
 def search_dir_for_data(path, **kwargs):
     subdirs = kwargs.pop('subdirs', [])
     blacklist = kwargs.pop('blacklist', [])
@@ -136,6 +138,7 @@ def search_dir_for_data(path, **kwargs):
         else:
             out[name] = p
     return out
+
 
 # Data loading
 def load_data_path(path, **kwargs):
@@ -181,6 +184,8 @@ def get_data_func(name, ext, compression, isfile):
         func = partial(dd.read_parquet, engine='pyarrow')
     elif ext == 'orc':
         func = dd.read_orc
+    elif ext == 'h5':
+        func = partial(dd.read_hdf, key='data')
     if func is None:
         log.error('Unsupported data format "{}" or compression "{}"'\
                   .format(ext, compression))

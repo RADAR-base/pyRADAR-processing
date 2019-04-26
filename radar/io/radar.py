@@ -27,6 +27,15 @@ def file_datehour(fn):
                         tz='UTC')
 
 
+def create_divisions(files):
+    try:
+        divisions = [file_datehour(fn) for fn in files]
+        divisions += [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
+    except ValueError:
+        divisions = None
+    return divisions
+
+
 def is_numeric(series):
     """ Checks whether pandas series dtype is a float or integer.
     Params:
@@ -49,11 +58,7 @@ def read_csv_folder(func):
     def wrapper(path, *args, **kwargs):
         files = glob_path_for_files(path, '*.csv*')
         files.sort()
-        try:
-            divisions = [file_datehour(fn) for fn in files] +\
-                        [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
-        except ValueError:
-            divisions = None
+        divisions = create_divisions(files)
         delayed_files = [delayed(func)(fn, *args, **kwargs)
                          for fn in files]
         df = dd.from_delayed(delayed_files, divisions=divisions)
@@ -73,6 +78,8 @@ def read_prmt_csv(dtype=None, timecols=None,
         timecols = []
     if timedeltas is None:
         timedeltas = {}
+
+    dtype['key.projectId'] = object
 
     @read_csv_folder
     def read_csv(path, *args, **kwargs):
