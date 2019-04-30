@@ -17,8 +17,7 @@ def out_paths(path, sep, files, *args, **kwargs):
         if blacklist is None:
             blacklist = []
         return [f for f in files if f in whitelist and
-                                    f not in blacklist and
-                                    f[0] != '.']
+                f not in blacklist and f[0] != '.']
     files = f_cond(files, *args, **kwargs)
     return [path.rstrip(sep) + sep + f for f in files]
 
@@ -32,10 +31,10 @@ def listdir(path, whitelist=None, blacklist=None, include=None, exclude=None):
                      blacklist=blacklist)
 
 def search_project_dir(path, subprojects=None, participants=None,
-                         blacklist=None):
+                       blacklist=None):
     fs = get_fs(**infer_storage_options(path))
     folders = fs.list_folders(path)
-    # files = fs.list_files(path)
+    # files = fs.list_files(path)
 
     blacklist = blacklist if blacklist is not None else []
     subprojects = subprojects if subprojects is not None else []
@@ -51,7 +50,7 @@ def search_project_dir(path, subprojects=None, participants=None,
             'participants': ptc}
 
 
-# Data searching
+# Data searching
 @lru_cache(8)
 def re_compile(pattern):
     return re.compile(pattern)

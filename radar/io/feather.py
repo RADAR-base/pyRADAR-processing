@@ -9,7 +9,7 @@ import pyarrow.feather as ft
 import pandas as pd
 import dask.dataframe as dd
 from dask import delayed
-from .radar import create_divisions
+from .core import create_divisions, glob_path_for_files
 
 
 def to_feather(df: pd.DataFrame, path: str) -> None:
@@ -46,7 +46,7 @@ def to_feather_dask(ddf: dd.DataFrame, path: str) -> None:
     ddf.map_partitions(to_feather, path, meta=object).compute()
 
 
-def read_feather_dask(paths: List[str]) -> dd.DataFrame:
+def read_feather_dask(path: str) -> dd.DataFrame:
     """ Read a collection of feather files with datetime name
     into a delayed dataframe
     Params:
@@ -54,8 +54,8 @@ def read_feather_dask(paths: List[str]) -> dd.DataFrame:
     Returns:
         dask.dataframe.DataFrame
     """
-    if isinstance(paths, list):
-        paths.sort()
+    paths = glob_path_for_files(path, '*feather')
+    paths.sort()
     to_pandas = delayed(pa.Table.to_pandas)
     dset = ft.FeatherDataset(paths)
     dset.read_table()

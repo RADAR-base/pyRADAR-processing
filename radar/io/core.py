@@ -52,3 +52,26 @@ def glob_path_for_files(path, file_extension):
     if fs.isfile(path):
         return [path]
     return fs.glob(path + fs.sep + file_extension)
+
+
+def file_datehour(fn):
+    """ Converts the RADAR CSV output filename to a Timestamp
+    Params:
+        fn (str): The filename
+    Returns:
+        pd.Timestamp
+    """
+    return pd.Timestamp(fn.split('/')[-1][0:13].replace('_', 'T'),
+                        tz='UTC')
+
+
+def create_divisions(files):
+    try:
+        divisions = [file_datehour(fn) for fn in files]
+        divisions += [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
+    except ValueError:
+        divisions = None
+    return divisions
+
+
+

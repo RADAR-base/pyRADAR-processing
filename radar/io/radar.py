@@ -7,32 +7,12 @@ import numpy as np
 import pandas as pd
 import dask.delayed as delayed
 import dask.dataframe as dd
-from .core import glob_path_for_files
+from .core import glob_path_for_files, create_divisions
 from .generic import _data_load_funcs
 from ..common import config
 from ..util.armt import melt
 
 DT_MULT = int(1e9)
-
-
-def file_datehour(fn):
-    """ Converts the RADAR CSV output filename to a Timestamp
-    Params:
-        fn (str): The filename
-    Returns:
-        pd.Timestamp
-    """
-    return pd.Timestamp(fn.split('/')[-1][0:13].replace('_', 'T'),
-                        tz='UTC')
-
-
-def create_divisions(files):
-    try:
-        divisions = [file_datehour(fn) for fn in files]
-        divisions += [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
-    except ValueError:
-        divisions = None
-    return divisions
 
 
 def is_numeric(series):
