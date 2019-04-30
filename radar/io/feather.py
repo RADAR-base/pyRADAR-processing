@@ -1,5 +1,9 @@
+""" Feather format multi-file IO
+Store a dask dataframe in a folder of multiple feather files.
+"""
 #!/usr/bin/env python3
 import os
+from typing import List
 import pyarrow as pa
 import pyarrow.feather as ft
 import pandas as pd
@@ -8,7 +12,7 @@ from dask import delayed
 from .radar import create_divisions
 
 
-def to_feather(df, path):
+def to_feather(df: pd.DataFrame, path: str) -> None:
     """ DataFrame to multi-file feather format. Uses the first row
     of first column as the file name. It is assumed to be a datetime.
     Params:
@@ -29,7 +33,7 @@ def to_feather(df, path):
     pd.DataFrame.to_feather(df, out_path)
 
 
-def to_feather_dask(ddf, path):
+def to_feather_dask(ddf: dd.DataFrame, path: str) -> None:
     """ DataFrame to multi-file feather format. Uses the first row
     of first column as the file name. It is assumed to be a datetime.
     Each partition is saved to an individual file.
@@ -42,7 +46,7 @@ def to_feather_dask(ddf, path):
     ddf.map_partitions(to_feather, path, meta=object).compute()
 
 
-def read_feather_dask(paths):
+def read_feather_dask(paths: List[str]) -> dd.DataFrame:
     """ Read a collection of feather files with datetime name
     into a delayed dataframe
     Params:

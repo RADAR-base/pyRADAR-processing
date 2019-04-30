@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import glob
 import base64
 from functools import wraps
 from typing import Callable, Dict
@@ -50,7 +49,6 @@ def convert_to_datetime(series):
     if is_numeric(series):
         return pd.DatetimeIndex(DT_MULT * series, tz='UTC')
     return pd.DatetimeIndex(pd.to_datetime(series))
-
 
 
 def read_csv_folder(func):

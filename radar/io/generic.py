@@ -8,6 +8,7 @@ from collections import Counter
 from dask.bytes.utils import infer_compression, infer_storage_options
 from ..common import log, config
 from .core import get_fs
+from .feather import read_feather_dask
 
 def out_paths(path, sep, files, *args, **kwargs):
     def f_cond(files, whitelist=None, blacklist=None):
@@ -186,6 +187,8 @@ def get_data_func(name, ext, compression, isfile):
         func = dd.read_orc
     elif ext == 'h5':
         func = partial(dd.read_hdf, key='data')
+    elif ext == 'feather':
+        func = read_feather_dask
     if func is None:
         log.error('Unsupported data format "{}" or compression "{}"'\
                   .format(ext, compression))
