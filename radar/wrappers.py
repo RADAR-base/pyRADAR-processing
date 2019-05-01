@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+import pandas as pd
 from . import config
 from .generic import AttrRecDict, update
 from .common import abs_path, log
 from .io.generic import search_project_dir, search_dir_for_data, load_data_path
+
 
 
 class PtcDict(AttrRecDict):
@@ -339,9 +341,16 @@ class ParticipantData(RadarObject):
         """
         self._parent = participant
         self._data = kwargs.pop('data', {})
+        self.files_newer_than = kwargs.pop('files_newer_than', None)
         paths = self._norm_paths(kwargs.pop('paths', None))
         for path in paths:
             self._search_path(path, **kwargs)
+
+
+    def get(self, key, default=None):
+        if key in self:
+            return self.__getitem__(key)
+        return None
 
     def __getitem__(self, key):
         val = self._data[key]
@@ -381,6 +390,9 @@ class ParticipantData(RadarObject):
                 self._data[k] = modals[k]
 
     def _load(self, name, path, **kwargs):
+        newer_than = self._get_attr_or_parents('files_newer_than')
+        if newer_than:
+            kwargs['files_newer_than'] = pd.Timestamp(newer_than).timestamp()
         data = load_data_path(path, **kwargs)
         if isinstance(data, dict):
             self._data.update(data)

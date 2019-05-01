@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import dask.delayed as delayed
 import dask.dataframe as dd
-from .core import glob_path_for_files, create_divisions
+from .core import glob_path_for_files, create_divisions, files_newer_than
 from .generic import _data_load_funcs
 from ..common import config
 from ..util.armt import melt
@@ -36,6 +36,11 @@ def read_csv_folder(func):
     def wrapper(path, *args, **kwargs):
         files = glob_path_for_files(path, '*.csv*')
         files.sort()
+        newer_than = kwargs.pop('files_newer_than', None)
+        if newer_than:
+            files = files_newer_than(files, newer_than)
+        if not files:
+            return None
         divisions = create_divisions(files)
         delayed_files = [delayed(func)(fn, *args, **kwargs)
                          for fn in files]
@@ -62,10 +67,9 @@ def read_prmt_csv(dtype=None, timecols=None,
     @read_csv_folder
     def read_csv(path, *args, **kwargs):
         df = pd.read_csv(path, *args, dtype=dtype, **kwargs)
-        df.loc[:, timecols] = df[timecols].apply(convert_to_datetime)
+        df[timecols] = df[timecols].apply(convert_to_datetime)
         for col, deltaunit in timedeltas.items():
             df[col] = df[col].astype('Int64').astype(deltaunit)
-
         if drop_unspecified:
             extracols = [c for c in df.columns
                          if c not in dtype and c[:3] != 'key']

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import List
 import pandas as pd
 from functools import lru_cache
 from dask.utils import import_required
@@ -54,6 +55,11 @@ def glob_path_for_files(path, file_extension):
     return fs.glob(path + fs.sep + file_extension)
 
 
+def files_newer_than(files: List[str], newer_than: float):
+    fs = get_fs(**infer_storage_options(files[0]))
+    return [f for f in files if fs.getctime(f) > newer_than]
+
+
 def file_datehour(fn):
     """ Converts the RADAR CSV output filename to a Timestamp
     Params:
@@ -69,7 +75,7 @@ def create_divisions(files):
     try:
         divisions = [file_datehour(fn) for fn in files]
         divisions += [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
-    except ValueError:
+    except (IndexError, ValueError):
         divisions = None
     return divisions
 
