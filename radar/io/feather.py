@@ -1,10 +1,8 @@
+#!/usr/bin/env python3
 """ Feather format multi-file IO
 Store a dask dataframe in a folder of multiple feather files.
 """
-#!/usr/bin/env python3
 import os
-from typing import List
-import pyarrow as pa
 import pyarrow.feather as ft
 import pandas as pd
 import dask.dataframe as dd
@@ -33,7 +31,7 @@ def to_feather(df: pd.DataFrame, path: str) -> None:
     pd.DataFrame.to_feather(df, out_path)
 
 
-def to_feather_dask(ddf: dd.DataFrame, path: str) -> None:
+def to_feather_dask(ddf: dd.DataFrame, path: str, compute: bool = True):
     """ DataFrame to multi-file feather format. Uses the first row
     of first column as the file name. It is assumed to be a datetime.
     Each partition is saved to an individual file.
@@ -41,27 +39,35 @@ def to_feather_dask(ddf: dd.DataFrame, path: str) -> None:
         ddf (dask.dataframe.DataFrame): Dask Dataframe to save
         path (str): Path to folder
     Returns:
-        None
+        None or delayed object (if compute=False)
     """
-    ddf.map_partitions(to_feather, path, meta=object).compute()
+    if compute:
+        ddf.map_partitions(to_feather, path, meta=object).compute()
+    return ddf.map_partitions(to_feather, path, meta=object)
 
 
 def read_feather_dask(path: str) -> dd.DataFrame:
     """ Read a collection of feather files with datetime name
     into a delayed dataframe
     Params:
-        paths (List[str]): Path to feather folder or file
+        path (str): Path to feather folder
     Returns:
         dask.dataframe.DataFrame
     """
+    def get_meta(path):
+        table = ft.read_table(path)
+        index = table.schema[0].name
+        return table.schema.empty_table().to_pandas().set_index(index)
+
+    @delayed
+    def read_pandas(path):
+        return ft.read_feather(path)
+
     paths = glob_path_for_files(path, '*feather')
     paths.sort()
-    to_pandas = delayed(pa.Table.to_pandas)
-    dset = ft.FeatherDataset(paths)
-    dset.read_table()
-    index = dset.schema[0].name
-    meta = dset.schema.empty_table().to_pandas().set_index(index)
-    delayed_objs = [to_pandas(t).set_index(index) for t in dset._tables]
-    divisions = create_divisions(dset.paths)
+    meta = get_meta(paths[0])
+    index = meta.index.name
+    delayed_objs = [read_pandas(p).set_index(index) for p in paths]
+    divisions = create_divisions(paths)
     ddf = dd.from_delayed(delayed_objs, meta=meta, divisions=divisions)
     return ddf

@@ -94,11 +94,13 @@ def infer_data_format(f, include='.*', exclude='.*schema.*json'):
         schema_regex = re_compile(config.schema.local_file_regex)
         schema_files = [f + '/' + x for x in fs.list_files(f)
                         if schema_regex.match(x)]
+        print('trying to use schema')
         if len(schema_files) > 0:
             from ..util.schemas import schema_from_file
             from .radar import schema_read_csv_funcs # TODO: make this generic and not just for radar data?
             schema = schema_from_file(schema_files[0])
             schema_read_csv_funcs({name: schema})
+            print('asd')
             log.debug("Loaded schema from local file {}".format(schema_files[0]))
 
     isfile = fs.isfile(f)
