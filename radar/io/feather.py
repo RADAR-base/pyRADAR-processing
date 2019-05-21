@@ -7,7 +7,8 @@ import pyarrow.feather as ft
 import pandas as pd
 import dask.dataframe as dd
 from dask import delayed
-from .core import create_divisions, glob_path_for_files
+from .core import glob_path_for_files
+from .generic import create_divisions
 
 
 def to_feather(df: pd.DataFrame, path: str) -> None:

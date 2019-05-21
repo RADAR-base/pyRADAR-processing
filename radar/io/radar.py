@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-import base64
 from functools import wraps
 from typing import Callable, Dict
-
-import numpy as np
 import pandas as pd
 import dask.delayed as delayed
 import dask.dataframe as dd
-from .core import glob_path_for_files, create_divisions, files_newer_than
-from .generic import _data_load_funcs
+from .core import glob_path_for_files, files_newer_than
+from .generic import create_divisions
 from ..common import config
 from ..util.armt import melt
 
@@ -131,88 +128,3 @@ def armt_read_csv_funcs(protocol) -> Dict[str, Callable]:
         name = armt.questionnaire.avsc + '_' + armt.questionnaire.name
         out[name] = read_armt_csv()
     return out
-
-
-if config['schema']['read_csvs']:
-    from ..util import schemas as _schemas
-    _data_load_funcs.update(schema_read_csv_funcs(_schemas.schemas))
-
-if config['protocol']['url'] or config['protocol']['file']:
-    from ..util import protocol as _protocol
-    _data_load_funcs.update(armt_read_csv_funcs(_protocol.protocols))
-
-
-# Fitbit temp
-_data_load_funcs['connect_fitbit_intraday_steps'] = read_prmt_csv(
-    dtype={
-        'value.time': float,
-        'value.timeReceived': float,
-        'value.timeInterval': int,
-        'value.steps': int
-    },
-    timecols=['value.time', 'value.timeReceived'],
-    timedeltas={'value.timeInterval': 'timedelta64[s]'})
-
-_data_load_funcs['connect_fitbit_intraday_heart_rate'] = read_prmt_csv(
-    dtype={
-        'value.time': float,
-        'value.timeReceived': float,
-        'value.timeInterval': int,
-        'value.heartRate': int
-    },
-    timecols=['value.time', 'value.timeReceived'],
-    timedeltas={'value.timeInterval': 'timedelta64[s]'})
-
-_data_load_funcs['connect_fitbit_sleep_stages'] = read_prmt_csv(
-    dtype={
-        'value.dateTime': object,
-        'value.timeReceived': float,
-        'value.duration': int,
-        'value.level': object
-    },
-    timecols=['value.dateTime', 'value.timeReceived'],
-    timedeltas={'value.duration': 'timedelta64[s]'},
-    index='dateTime')
-
-_data_load_funcs['connect_fitbit_sleep_classic'] = read_prmt_csv(
-    dtype={
-        'value.dateTime': object,
-        'value.timeReceived': float,
-        'value.duration': int,
-        'value.level': object
-    },
-    timecols=['value.dateTime', 'value.timeReceived'],
-    timedeltas={'value.duration': 'timedelta64[s]'},
-    index='dateTime')
-
-
-_data_load_funcs['connect_fitbit_time_zone'] = read_prmt_csv(
-    dtype={
-        'value.timeReceived': float,
-        'value.timeZoneOffset': int
-    },
-    timecols=['value.timeReceived'],
-    index='timeReceived')
-
-
-def read_processed_audio():
-    def convert_data(x):
-        return np.array(base64.b64decode(''.join(x.split('\\n')))
-                .split(b'\n')[1].split(b';')[1:], dtype=float)
-
-    def convert_data_delayed(series):
-        return series.map(convert_data)
-
-    def read_csv(path, *args, **kwargs):
-        df = delayed_read(path, *args, **kwargs)
-        df = df.dropna()
-        df['data'] = df['data'].map_partitions(
-             convert_data_delayed, meta=('data', object))
-        return df
-
-    delayed_read = read_prmt_csv(timecols=['value.time', 'value.timeReceived'],
-                                 dtype={'value.data': object})
-    return read_csv
-
-
-_data_load_funcs['android_processed_audio'] = read_processed_audio()

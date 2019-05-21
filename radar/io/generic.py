@@ -1,205 +1,23 @@
 #!/usr/bin/env python3
-import re
+""" Generic IO functions
+"""
+from typing import List, Union
 import numpy as np
 import pandas as pd
-import dask.dataframe as dd
-from functools import lru_cache, partial
-from collections import Counter
-from dask.bytes.utils import infer_compression, infer_storage_options
-from ..common import log, config
-from .core import get_fs
-from .feather import read_feather_dask
-
-def out_paths(path, sep, files, *args, **kwargs):
-    def f_cond(files, whitelist=None, blacklist=None):
-        if whitelist is None:
-            whitelist = files
-        if blacklist is None:
-            blacklist = []
-        return [f for f in files if f in whitelist and
-                f not in blacklist and f[0] != '.']
-    files = f_cond(files, *args, **kwargs)
-    return [path.rstrip(sep) + sep + f for f in files]
-
-def listdir(path, whitelist=None, blacklist=None, include=None, exclude=None):
-    fs = get_fs(**infer_storage_options(path))
-    files = fs.list_files(path) + fs.list_folders(path)
-    blacklist = blacklist if blacklist is not None else []
-    whitelist = whitelist if whitelist is not None else files
-    return out_paths(path, fs.sep, files,
-                     whitelist=whitelist,
-                     blacklist=blacklist)
-
-def search_project_dir(path, subprojects=None, participants=None,
-                       blacklist=None):
-    fs = get_fs(**infer_storage_options(path))
-    folders = fs.list_folders(path)
-    # files = fs.list_files(path)
-
-    blacklist = blacklist if blacklist is not None else []
-    subprojects = subprojects if subprojects is not None else []
-
-    sp = out_paths(path, fs.sep, folders,
-                   whitelist=subprojects if subprojects else [],
-                   blacklist=blacklist)
-    ptc = out_paths(path, fs.sep, folders,
-                    whitelist=participants,
-                    blacklist=subprojects + blacklist)
-
-    return {'subprojects': sp,
-            'participants': ptc}
+from ..generic import methdispatch
 
 
-# Data searching
-@lru_cache(8)
-def re_compile(pattern):
-    return re.compile(pattern)
+class FakeDatetimeArray():
+    """ A fake numpy datetime array
+    """
+    ndim = 1
+    _index_error = (
+        'Only integer, slices (`:`), ellipsis (`...`), '
+        ' integer arrays or boolean arrays are valid indices')
 
-
-def infer_data_format(f, include='.*', exclude='.*schema.*json'):
-    def infer_file_format(f):
-        comp = infer_compression(f)
-        i = 2 if comp else 1
-        file_split = f.split('.')
-        ext = file_split[-i]
-        return [ext, comp]
-
-    def infer_folder_format(path, include=None, exclude='.*schema.*json'):
-        fs = get_fs(**infer_storage_options(path))
-        folder_split = path.split(fs.sep)[-1].split('.')
-        if len(folder_split) > 1:
-            return [folder_split[-1], None]
-
-        if include is not None:
-            include = re_compile(include)
-        if exclude is not None:
-            exclude = re_compile(exclude)
-        exts_comps = list(zip(*(infer_file_format(x) for x in fs.list_files(path)
-                               if (include is None or include.match(x))
-                               and (exclude is None or not exclude.match(x)))))
-        exts, comps = exts_comps or [[None], [None]]
-        ext = Counter(exts).most_common(1)[0][0]
-        comp = Counter(comps).most_common(1)[0][0]
-        if len(set(exts)) > 1:
-            log.warning('Not all file formats in {} are the same'.format(path))
-        if len(set(comps)) > 1:
-            log.warning('Not all compressions in {} are the same'.format(path))
-        return [ext, comp]
-
-    fs = get_fs(**infer_storage_options(f))
-    f = f.rstrip(fs.sep)
-    name = f.split(fs.sep)[-1]
-
-    if config.schema.from_local_file:
-        schema_regex = re_compile(config.schema.local_file_regex)
-        schema_files = [f + '/' + x for x in fs.list_files(f)
-                        if schema_regex.match(x)]
-        print('trying to use schema')
-        if len(schema_files) > 0:
-            from ..util.schemas import schema_from_file
-            from .radar import schema_read_csv_funcs # TODO: make this generic and not just for radar data?
-            schema = schema_from_file(schema_files[0])
-            schema_read_csv_funcs({name: schema})
-            print('asd')
-            log.debug("Loaded schema from local file {}".format(schema_files[0]))
-
-    isfile = fs.isfile(f)
-    if isfile:
-        ext, comp = infer_file_format(f)
-    else:
-        ext, comp = infer_folder_format(f, include, exclude)
-    return [name, ext, comp, isfile]
-
-
-COMBI_DATA = {'IMEC': ('imec_acceleration', 'imec_gsr',
-                       'imec_ecg', 'imec_emg',
-                       'imec_temperature', 'imec_pie')}
-
-
-def search_dir_for_data(path, **kwargs):
-    subdirs = kwargs.pop('subdirs', [])
-    blacklist = kwargs.pop('blacklist', [])
-    if isinstance(subdirs, str):
-        subdirs = [subdirs]
-    blacklist = blacklist + subdirs
-    fs = get_fs(**infer_storage_options(path))
-    paths = listdir(path, blacklist=blacklist,
-                    whitelist=kwargs.get('whitelist', None),
-                    include=kwargs.get('include', None),
-                    exclude=kwargs.get('exclude', None))
-    for sd in subdirs:
-        subpath = path.rstrip(fs.sep) + fs.sep + sd
-        if fs.isdir(subpath):
-            paths.extend(listdir(subpath, **kwargs))
-    out = {}
-    for p in paths:
-        name = p.split(fs.sep)[-1]
-        if name in COMBI_DATA:
-            for n in COMBI_DATA[name]:
-                out[n] = p
-        else:
-            out[name] = p
-    return out
-
-
-# Data loading
-def load_data_path(path, **kwargs):
-    func = get_data_func(*infer_data_format(path))
-    return func(path, **kwargs)
-
-
-_data_load_funcs = {}
-
-
-def get_data_func(name, ext, compression, isfile):
-    func = None
-    ext_comp = (ext, compression)
-
-    if ext is None:
-        return (lambda *args, **kwargs: None)
-
-    if name in _data_load_funcs:
-        return _data_load_funcs[name]
-    elif ext_comp in _data_load_funcs:
-        return _data_load_funcs[ext_comp]
-
-    if name == 'IMEC':
-        from .imec import Imec
-        func = Imec
-
-    if ext == 'csv':
-        func = lambda path, *args, **kwargs: \
-                dd.read_csv(path if isfile else path + '/*.csv*',
-                            compression=compression, blocksize=None,
-                            *args, **kwargs)
-    elif ext == 'tsv':
-        func = lambda path, *args, **kwargs: \
-                dd.read_tsv(path if isfile else path + '/*.tsv*',
-                            compression=compression, blocksize=None,
-                            *args, **kwargs)
-    elif ext == 'json':
-        func = lambda path, *args, **kwargs: \
-                dd.read_json(path if isfile else path + '/*.json*',
-                             compression=compression, blocksize=None,
-                             *args, **kwargs)
-    elif ext == 'parquet' or ext == 'pq':
-        func = partial(dd.read_parquet, engine='pyarrow')
-    elif ext == 'orc':
-        func = dd.read_orc
-    elif ext == 'h5':
-        func = partial(dd.read_hdf, key='data')
-    elif ext == 'feather':
-        func = read_feather_dask
-    if func is None:
-        log.error('Unsupported data format "{}" or compression "{}"'\
-                  .format(ext, compression))
-        func = lambda *args, **kwargs: None
-    _data_load_funcs[ext_comp] = func
-    return func
-
-
-class FakeDatetimeArray(object):
-    def __init__(self, start, length, freq=None, step=None):
+    def __init__(self, start: np.datetime64, length: int,
+                 freq: Union[int, float, None] = None,
+                 step: Union[int, float, None] = None):
         """
         step : int
             step size in seconds (1/freq)
@@ -214,41 +32,136 @@ class FakeDatetimeArray(object):
         else:
             self.freq = freq
             self.step = int(1e9 / self.freq)
-        self.start = pd.Timestamp(start, 'ns').asm8.astype('int64')
+        self.start = pd.Timestamp(start, 'ns').asm8
         self.length = length
         self.shape = (length,)
         self.dtype = np.dtype('datetime64[ns]')
 
-    def __getitem__(self, x):
-        idx_error = ('only integers, slices (`:`), ellipsis (`...`),',
-                     ' and integer or boolean arrays are valid indices')
-        if isinstance(x, tuple):
-            x = x[0]
-        arr = None
-        if isinstance(x, slice):
-            start = 0 if x.start is None else x.start
-            stop = self.length if x.stop is None else x.stop
-            step = 1 if x.step is None else x.step
-            arr = np.array(range(start, stop, step))
-        if isinstance(x, list):
-            if isinstance(x[0], bool) and self.length == len(x):
-                arr = np.where(x)
-            if isinstance(x[0], int):
-                arr = np.array(x)
-        elif isinstance(x, np.ndarray):
-            if x.dtype == 'bool':
-                arr = np.where(x)
-            else:
-                arr = x
-        elif isinstance(x, int):
-            arr = np.array(x)
-        elif x == Ellipsis:
-            arr = np.array(range(self.length))
-        if arr is None:
-            raise IndexError(idx_error)
-        arr = arr[arr >= 0]
-        arr = arr[arr < self.length]
-        return pd.DatetimeIndex(((self.start + (arr * self.step)).astype('datetime64[ns]')))
-
     def __len__(self):
         return self.length
+
+    @methdispatch
+    def __getitem__(self, x):
+        if x == Ellipsis:
+            return self.arange(0, self.length, 1)
+        raise IndexError(self._index_error)
+
+    @__getitem__.register(slice)
+    def __getslice__(self, x):
+        start, stop, step = self.positive(x)
+        return self.arange(start, stop, step)
+
+    @__getitem__.register(tuple)
+    def __gettuple__(self, x):
+        return self.__getitem__(x[0])
+
+    @__getitem__.register(int)
+    def __getint__(self, x):
+        x = self.positive(x)
+        if 0 <= x < self.length:
+            return self(x)
+        raise IndexError(str(x) + ' is outside of 0-' + str(self.length))
+
+    @__getitem__.register(list)
+    def __getlist__(self, x):
+        arr = None
+        if isinstance(x[0], bool) and self.length == len(x):
+            arr = np.where(x)
+        elif isinstance(x[0], int):
+            arr = np.array(x)
+        if arr:
+            self.from_arr(arr)
+        raise IndexError(self._index_error)
+
+    @__getitem__.register(np.ndarray)
+    def __getnp__(self, x):
+        if x.dtype == 'bool' and self.length == len(x):
+            arr = np.where(x)
+        else:
+            arr = x
+        if arr:
+            return self.from_arr(arr)
+        raise IndexError(self._index_error)
+
+    def from_arr(self, arr: np.ndarray) -> np.ndarray:
+        """ Return datetime array from index array
+        Params:
+            arr (np.ndarray): Index array
+        Returns:
+            np.ndarray[np.datetime64]
+        """
+        return self.start + (arr * self.step)
+
+    def __call__(self, x: int) -> np.ndarray:
+        return self.start + (self.positive(x) * self.step)
+
+    def arange(self, start: int, stop: int, step: int = 1) -> np.ndarray:
+        """ Return evenly spaced numpy datetime array from
+        start / stop / step index
+        Params:
+            start (int): Starting index of array
+            stop (int): Stop index of array
+            step (int): Step between index elements
+        Returns:
+            np.ndarray[np.datetime64]: Datetime array
+        """
+        dt_start = self(start)
+        dt_stop = self(stop)
+        dt_step = self.step * step
+        return np.arange(dt_start, dt_stop, dt_step)
+
+    @methdispatch
+    def positive(self, x):
+        """ Returns array length - x if x is less than 0
+        Params:
+            x (int): Array integer
+        Returns:
+            int: positive array integer
+        """
+        if x < 0:
+            return self.length + x
+        return x
+
+    @positive.register(np.ndarray)
+    def _(self, x):
+        x[x < 0] = self.length + x[x < 0]
+        if (x < 0).any():
+            raise IndexError('Some indx outside of range')
+        return x
+
+    @positive.register(slice)
+    def _(self, x):
+        start = self.positive(x.start if x.start else 0)
+        stop = self.positive(x.stop if x.stop else self.length)
+        step = x.step if x.step else 1
+        if start < 0:
+            start = 0
+        if stop < 0:
+            stop = 0
+        return start, stop, step
+
+
+def file_datehour(fn: str):
+    """ Converts the RADAR CSV output filename to a Timestamp
+    Params:
+        fn (str): The filename
+    Returns:
+        pd.Timestamp
+    """
+    return pd.Timestamp(fn.split('/')[-1][0:13].replace('_', 'T'),
+                        tz='UTC')
+
+
+def create_divisions(files: List[str]) -> List[np.datetime64]:
+    """ Create Dask Dataframe datetime divisions from RADAR CSV file names
+    Params:
+        files (List[str]): List of file names
+    Returns:
+        List[np.datetime64]: Dask partition divisions
+    """
+    try:
+        divisions = [file_datehour(fn) for fn in files]
+        divisions += [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
+    except (IndexError, ValueError):
+        divisions = None
+    return divisions

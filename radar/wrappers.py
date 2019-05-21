@@ -3,7 +3,7 @@ import pandas as pd
 from . import config
 from .generic import AttrRecDict, update
 from .common import abs_path, log
-from .io.generic import search_project_dir, search_dir_for_data, load_data_path
+from .io.loaders import search_project_dir, search_dir_for_data, load_data_path
 
 
 
