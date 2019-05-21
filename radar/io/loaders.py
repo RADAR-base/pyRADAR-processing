@@ -131,7 +131,7 @@ def infer_data_format(f, include='.*', exclude='.*schema.*json'):
 
 
 def load_data_path(path, **kwargs):
-    if config.schema.from_local_file:
+    if config['schema']['from_local_file']:
         fs = get_fs(**infer_storage_options(path))
         if fs.isdir(path):
             schema_files = [path + '/' + x for x in fs.list_files(path)
@@ -141,8 +141,7 @@ def load_data_path(path, **kwargs):
                 f = read_prmt_csv(dtype=schema.dtype(),
                                   timecols=schema.timecols(),
                                   timedeltas=schema.timedeltas())
-                log.debug("Loaded schema from local file {}"
-                          .format(schema_files[0]))
+                log.debug('Loaded schema from local file %s', schema_files[0])
                 return f(path, **kwargs)
 
     func = get_data_func(*infer_data_format(path))
@@ -158,11 +157,11 @@ def get_data_func(name, ext, compression, isfile):
 
     if name in _data_load_funcs:
         return _data_load_funcs[name]
-    elif ext_comp in _data_load_funcs:
+    if ext_comp in _data_load_funcs:
         return _data_load_funcs[ext_comp]
 
     if name == 'IMEC':
-        from .imec2 import imec_all_signals
+        from .imec import imec_all_signals
         func = imec_all_signals
 
     if ext == 'csv':
@@ -182,8 +181,8 @@ def get_data_func(name, ext, compression, isfile):
     elif ext == 'feather':
         func = read_feather_dask
     if func is None:
-        log.error('Unsupported data format "{}" or compression "{}"'
-                  .format(ext, compression))
+        log.error('Unsupported data format "%s" or compression "%s"',
+                  ext, compression)
         func = load_none
     _data_load_funcs[ext_comp] = func
     return func
