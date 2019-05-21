@@ -190,7 +190,7 @@ def get_data_func(name, ext, compression, isfile):
 
 def read_dd_generic(func, isfile, compression, glob):
     def load(path, *args, **kwargs):
-        p = path if isfile else path + glob
+        p = path if isfile else path + '/' + glob
         return func(p, compression=compression, blocksize=None,
                     *args, **kwargs)
     return load
