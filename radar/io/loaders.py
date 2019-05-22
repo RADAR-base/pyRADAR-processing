@@ -11,13 +11,22 @@ from .feather import read_feather_dask
 from ..generic import re_compile
 from ..common import log, config
 
-COMBI_DATA = {'IMEC': ('imec_acceleration', 'imec_gsr',
-                       'imec_ecg', 'imec_emg')}
-_data_load_funcs = {}
+COMBI_DATA = {
+    'IMEC': (
+        'imec_old_acceleration',
+        'imec_old_ecg',
+        'imec_old_emg',
+        'imec_old_gsr'
+    ),
+    'IMEC H5': (
+        'imec_acceleration',
+        'imec_ecg',
+        'imec_emg',
+        'imec_gsr'
+    )
+}
 
-if config['schema']['from_local_file']:
-    from ..util.schemas import schema_from_file
-    SCHEMA_REGEX = re_compile(config['schema']['local_file_regex'])
+_data_load_funcs = {}
 
 
 def out_paths(path, sep, files, *args, **kwargs):
@@ -132,6 +141,8 @@ def infer_data_format(f, include='.*', exclude='.*schema.*json'):
 
 def load_data_path(path, **kwargs):
     if config['schema']['from_local_file']:
+        from ..util.schemas import schema_from_file
+        SCHEMA_REGEX = re_compile(config['schema']['local_file_regex'])
         fs = get_fs(**infer_storage_options(path))
         if fs.isdir(path):
             schema_files = [path + '/' + x for x in fs.list_files(path)
@@ -152,17 +163,17 @@ def get_data_func(name, ext, compression, isfile):
     func = None
     ext_comp = (ext, compression)
 
-    if ext is None:
-        return (lambda *args, **kwargs: None)
-
     if name in _data_load_funcs:
         return _data_load_funcs[name]
     if ext_comp in _data_load_funcs:
         return _data_load_funcs[ext_comp]
 
     if name == 'IMEC':
-        from .imec import imec_all_signals
-        func = imec_all_signals
+        from .imec import imec_old_all
+        func = imec_old_all
+    elif name == 'IMEC H5':
+        from .imec import imec_h5_all
+        func = imec_h5_all
 
     if ext == 'csv':
         func = read_dd_generic(dd.read_csv, isfile, compression, '*.csv*')
@@ -176,8 +187,6 @@ def get_data_func(name, ext, compression, isfile):
         func = partial(dd.read_parquet, engine='pyarrow')
     elif ext == 'orc':
         func = dd.read_orc
-    elif ext == 'h5':
-        func = partial(dd.read_hdf, key='data')
     elif ext == 'feather':
         func = read_feather_dask
     if func is None:

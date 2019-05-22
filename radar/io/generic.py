@@ -69,8 +69,8 @@ class FakeDatetimeArray():
             arr = np.where(x)
         elif isinstance(x[0], int):
             arr = np.array(x)
-        if arr:
-            self.from_arr(arr)
+        if arr is not None:
+            return self.from_arr(arr)
         raise IndexError(self._index_error)
 
     @__getitem__.register(np.ndarray)
@@ -79,7 +79,7 @@ class FakeDatetimeArray():
             arr = np.where(x)
         else:
             arr = x
-        if arr:
+        if arr is not None:
             return self.from_arr(arr)
         raise IndexError(self._index_error)
 
@@ -90,7 +90,7 @@ class FakeDatetimeArray():
         Returns:
             np.ndarray[np.datetime64]
         """
-        return self.start + (arr * self.step)
+        return pd.DatetimeIndex(self.start + (arr * self.step))
 
     def __call__(self, x: int) -> np.ndarray:
         return self.start + (self.positive(x) * self.step)

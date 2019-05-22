@@ -5,8 +5,8 @@ import h5py
 import pandas as pd
 import dask.array as da
 import dask.dataframe as dd
-from .core import glob_path_for_files
-from .generic import FakeDatetimeArray, terminal_folders
+from .core import glob_path_for_files, terminal_folders
+from .generic import FakeDatetimeArray
 
 
 class ImecFile():
@@ -67,7 +67,8 @@ class ImecFile():
 
     @property
     def dask_chunks(self):
-        return self.chunks[0] * 32
+        # 8388608 = 32mb int64
+        return self.chunks[0] * (8388608 // self.chunks[0])
 
     @property
     def dask_time(self):
@@ -113,8 +114,33 @@ class ImecDataset():
         return dd.concat([cg.dask_dataframe for cg in self._ctg_grps])
 
 
-def imec_dataset(path, signals):
+class ImecOldDataset():
+    def __init__(self, path: str, signals: List[str]):
+        imec_files = [fp for p in terminal_folders(path)
+                      for fp in glob_path_for_files(p, '*.h5')]
+        self._imec_files = [ImecFile(f, signals) for f in imec_files]
+
+    @property
+    def dask_dataframe(self):
+        return dd.concat([im.dask_dataframe for im in self._imec_files])
+
+
+def imec_dataset(path: str, signals: List[str]):
     ids = ImecDataset(path, signals)
+    ddf = ids.dask_dataframe
+    ddf.imec_dataset = ids
+    return ddf
+
+
+def imec_single(path: str, signals: List[str]):
+    imec = ImecFile(path, signals)
+    ddf = imec.dask_dataframe
+    ddf.imec_file = imec
+    return ddf
+
+
+def imec_old(path: str, signals: List[str]):
+    ids = ImecOldDataset(path, signals)
     ddf = ids.dask_dataframe
     ddf.imec_dataset = ids
     return ddf
@@ -126,11 +152,23 @@ imec_emg = partial(imec_dataset, signals=('EMG',))
 imec_gsr = partial(imec_dataset, signals=('GSR-1', 'GSR-2'))
 
 
-def imec_all_signals(path):
+def imec_h5_all(path):
     out = {
         'imec_acceleration': imec_acceleration(path),
         'imec_ecg': imec_ecg(path),
         'imec_emg': imec_emg(path),
         'imec_gsr': imec_gsr(path)
+    }
+    return out
+
+
+def imec_old_all(path):
+    out = {
+        'imec_old_acceleration': imec_old(path, signals=('ACC-X',
+                                                         'ACC-Y',
+                                                         'ACC-Z')),
+        'imec_old_ecg': imec_old(path, signals=('ECG',)),
+        'imec_old_emg': imec_emg(path, signals=('EMG',)),
+        'imec_old_gsr': imec_gsr(path, signals=('GSR-1', 'GSR-2'))
     }
     return out
