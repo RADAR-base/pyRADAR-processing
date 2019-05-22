@@ -116,10 +116,19 @@ class RadarSchema():
     def timecols(self):
         return [name for name, doc in
                 zip(self.get_col_names(), self.get_col_info_by_key('doc'))
-                if 'timestamp' in doc]
+                if 'timestamp' in doc.lower()]
 
     def timedeltas(self):
-        return {name: 'S' for name in self.get_col_names()
+        def get_dtype(doc):
+            dtype = 'timedelta64[s]'
+            if 'milli' in doc:
+                dtype = 'timedelta64[ms]'
+            if 'micro' in doc:
+                dtype = 'timedelta64[us]'
+            return dtype
+
+        return {name: get_dtype(doc.lower()) for name, doc in
+                zip(self.get_col_names(), self.get_col_info_by_key('doc'))
                 if 'duration' in name.lower() or 'interval' in name.lower()}
 
 
