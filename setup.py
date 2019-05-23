@@ -16,6 +16,7 @@ setup(name='radarstudy',
           'requests',
           'matplotlib',
           'yml',
+          'pyyaml',
           'pyarrow'
           ],
       include_package_data=True,

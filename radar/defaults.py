@@ -81,8 +81,8 @@ def update(d, u):
 _CONFIG_DEFAULT_FILE = os.path.join(_ROOT, 'config.yml')
 if os.path.exists(_CONFIG_DEFAULT_FILE):
     with open(_CONFIG_DEFAULT_FILE) as f:
-        update(config, yaml.load(f))
+        update(config, yaml.load(f, Loader=yaml.FullLoader))
 
 if 'config.yml' in os.listdir():
     with open('config.yml', 'r') as f:
-        update(config, yaml.load(f))
+        update(config, yaml.load(f, Loader=yaml.FullLoader))
