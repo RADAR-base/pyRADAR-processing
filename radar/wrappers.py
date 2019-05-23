@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import pandas as pd
 from . import config
 from .generic import AttrRecDict, update
@@ -46,10 +47,10 @@ class RadarObject():
         """
         parent = self._parent
         if parent is None:
-            return '/'
-        path = '/' + (self.name if hasattr(self, 'name') else '')
+            return os.path.sep
+        path = os.path.sep + (self.name if hasattr(self, 'name') else '')
         while parent._parent is not None:
-            path = '/' + parent.name + path
+            path = os.path.sep + parent.name + path
             parent = parent._parent
         return path
 
@@ -206,13 +207,13 @@ class Project(RadarObject):
 
     def _add_subprojects(self, paths, **kwargs):
         for p in paths:
-            name = p.split('/')[-1]
+            name = p.split(os.path.sep)[-1]
             sp = self.add_subproject(name, **kwargs)
             sp.add_path(p, **kwargs)
 
     def _add_participants(self, paths, **kwargs):
         for p in paths:
-            name = p.split('/')[-1]
+            name = p.split(os.path.sep)[-1]
             if name in self.participants:
                 ptc = self.participants[name]
                 ptc.add_path(p, **kwargs.get('datakw', {}))
@@ -268,7 +269,7 @@ class Participant(RadarObject):
         if not (name or paths):
             raise ValueError(('You must specify a name or else provide'
                               'a path (or paths) to the participant'))
-        self.name = name if name is not None else paths[0].split('/')[-1]
+        self.name = name if name is not None else paths[0].split(os.path.sep)[-1]
         self._parent = kwargs.get('parent', None)
         self.info = kwargs.get('info', {})
         self.labels = kwargs.get('labels', {})

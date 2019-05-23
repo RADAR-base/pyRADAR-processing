@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 import pandas as pd
 pd.plotting.register_matplotlib_converters()
@@ -56,7 +57,7 @@ def data_plot(ptc, modalities, start, end, freq, ax=None, events=None, event_bou
 
     if not outdir: fig.set_tight_layout(True)
 
-    if outdir: fig.savefig('{}/{}_data.png'.format(outdir, ptc.name), dpi=288, bbox_inches='tight')
+    if outdir: fig.savefig('{}{}{}_data.png'.format(outdir, os.path.sep, ptc.name), dpi=288, bbox_inches='tight')
     else: plt.show()
     plt.close(fig)
 
@@ -101,6 +102,6 @@ def data_detail_plot(ptc, ev, modalities, bounds, outdir=None, resample=None):
 
     if not outdir: ev_fig.set_tight_layout(True)
 
-    if outdir: ev_fig.savefig('{}/{}_event_{}_{}_{}-{}.png'.format(outdir, ptc.name, ev.strftime('%Y%m%d-%H%M%S'), resample if resample else 'raw', int(bounds[0].seconds/60), int(bounds[1].seconds/60)), dpi=288, bbox_inches='tight')
+    if outdir: ev_fig.savefig('{}{}{}_event_{}_{}_{}-{}.png'.format(outdir, os.path.sep, ptc.name, ev.strftime('%Y%m%d-%H%M%S'), resample if resample else 'raw', int(bounds[0].seconds/60), int(bounds[1].seconds/60)), dpi=288, bbox_inches='tight')
     else: plt.show()
     plt.close(ev_fig)
