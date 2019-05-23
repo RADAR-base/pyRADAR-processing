@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
+pd.plotting.register_matplotlib_converters()
 import dask.dataframe as dd
 
 from ..common import log
