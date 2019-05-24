@@ -1,11 +1,14 @@
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
-pd.plotting.register_matplotlib_converters()
 import dask.dataframe as dd
 
 from ..common import log
 from ..util.parsers import timestamp_from_string
+
+
+pd.plotting.register_matplotlib_converters()
+
 
 def data_plot(ptc, modalities, start, end, freq, ax=None, events=None, event_bounds=None, event_resample=None, outdir=None):
     """ Plots the given participant data as lineplots
@@ -60,7 +63,6 @@ def data_plot(ptc, modalities, start, end, freq, ax=None, events=None, event_bou
     if outdir: fig.savefig('{}{}{}_data.png'.format(outdir, os.path.sep, ptc.name), dpi=288, bbox_inches='tight')
     else: plt.show()
     plt.close(fig)
-
 
 
 def data_detail_plot(ptc, ev, modalities, bounds, outdir=None, resample=None):
