@@ -8,7 +8,6 @@ from dask.bytes.utils import infer_compression, infer_storage_options
 from .core import get_fs
 from .radar import read_prmt_csv, armt_read_csv_funcs, schema_read_csv_funcs
 from .feather import read_feather_dask
-from .zarr import read_zarr
 from ..generic import re_compile
 from ..common import log, config
 
@@ -189,7 +188,12 @@ def get_data_func(name, ext, compression, isfile):
     elif ext == 'feather':
         func = read_feather_dask
     elif ext == 'zdf':
-        func = read_zarr
+        try:
+            from .zarr import read_zarr
+            func = read_zarr
+        except ImportError e:
+            log.error('No "zarr" package found - can not load zarr files')
+
     if func is None:
         log.error('Unsupported data format "%s" or compression "%s"',
                   ext, compression)

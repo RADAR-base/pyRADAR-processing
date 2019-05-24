@@ -16,7 +16,7 @@ setup(name='radarstudy',
           'requests',
           'matplotlib',
           'pyyaml>=5.1',
-          'pyarrow'
+          'pyarrow',
           ],
       include_package_data=True,
       classifiers=[
