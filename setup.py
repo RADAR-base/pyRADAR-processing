@@ -10,7 +10,6 @@ setup(name='radarstudy',
       packages=find_packages(),
       install_requires=[
           'numpy',
-          'scipy',
           'pandas',
           'dask[complete]',
           'requests',
