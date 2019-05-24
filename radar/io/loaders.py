@@ -8,6 +8,7 @@ from dask.bytes.utils import infer_compression, infer_storage_options
 from .core import get_fs
 from .radar import read_prmt_csv, armt_read_csv_funcs, schema_read_csv_funcs
 from .feather import read_feather_dask
+from .zarr import read_zarr
 from ..generic import re_compile
 from ..common import log, config
 
@@ -105,11 +106,9 @@ def infer_data_format(f, include='.*', exclude='.*schema.*json'):
         return [ext, comp]
 
     def infer_folder_format(path, include=None, exclude='.*schema.*json'):
-        fs = get_fs(**infer_storage_options(path))
         folder_split = path.split(fs.sep)[-1].split('.')
         if len(folder_split) > 1:
             return [folder_split[-1], None]
-
         if include is not None:
             include = re_compile(include)
         if exclude is not None:
@@ -189,6 +188,8 @@ def get_data_func(name, ext, compression, isfile):
         func = dd.read_orc
     elif ext == 'feather':
         func = read_feather_dask
+    elif ext == 'zdf':
+        func = read_zarr
     if func is None:
         log.error('Unsupported data format "%s" or compression "%s"',
                   ext, compression)
