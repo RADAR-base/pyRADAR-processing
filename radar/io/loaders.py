@@ -191,7 +191,7 @@ def get_data_func(name, ext, compression, isfile):
         try:
             from .zarr import read_zarr
             func = read_zarr
-        except ImportError e:
+        except ImportError:
             log.error('No "zarr" package found - can not load zarr files')
 
     if func is None:
