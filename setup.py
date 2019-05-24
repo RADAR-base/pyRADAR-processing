@@ -15,7 +15,8 @@ setup(name='radarstudy',
           'dask[complete]',
           'requests',
           'matplotlib',
-          'yml'
+          'pyyaml>=5.1',
+          'pyarrow'
           ],
       include_package_data=True,
       classifiers=[

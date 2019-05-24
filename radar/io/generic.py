@@ -2,6 +2,7 @@
 """ Generic IO functions
 """
 from typing import List, Union
+import os
 import numpy as np
 import pandas as pd
 from ..generic import methdispatch
@@ -148,8 +149,7 @@ def file_datehour(fn: str):
     Returns:
         pd.Timestamp
     """
-    return pd.Timestamp(fn.split('/')[-1][0:13].replace('_', 'T'),
-                        tz='UTC')
+    return pd.Timestamp(os.path.normpath(fn).split(os.path.sep)[-1][0:13].replace('_', 'T'), tz='UTC')
 
 
 def create_divisions(files: List[str]) -> List[np.datetime64]:
