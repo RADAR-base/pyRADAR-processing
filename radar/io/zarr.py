@@ -38,8 +38,10 @@ def df_to_zarr(df: pd.DataFrame, path: str, group=None,
 
 @to_zarr.register(dd.DataFrame)
 def dask_to_zarr(ddf: dd.DataFrame, path: str, group=None,
-                 overwrite=False, append=True, chunks=(2097152,), **kwargs):
-    def get_divisions(index):
+                 overwrite=False, append=True, chunks=(16777216,),
+                 compute=True):
+    def get_divisions(group, index):
+        index = index if index is not None else 'index'
         nchunks = group[index].nchunks
         divisions = np.zeros(nchunks + 1, group[index].dtype)
         chunk = group[index].chunks[0]
@@ -47,11 +49,19 @@ def dask_to_zarr(ddf: dd.DataFrame, path: str, group=None,
         divisions[-1] = group[index][-1]
         return divisions
 
-    group = get_group(path, group, overwrite)
-    for p in ddf.partitions:
-        df_to_zarr(p.compute(), group=group, path=path,
-                   append=append, chunks=chunks)
-    group['.divisions'] = get_divisions(ddf.index.name)
+    @delayed
+    def ddf_to_zarr(group):
+        group = get_group(path, group, overwrite)
+        for p in ddf.partitions:
+            df_to_zarr(p.compute(), group=group, path=path,
+                       append=append, chunks=chunks)
+        group['.divisions'] = get_divisions(group, ddf.index.name)
+
+    delayed_write = ddf_to_zarr(group)
+
+    if compute:
+        return delayed_write.compute()
+    return delayed_write
 
 
 @to_zarr.register(np.ndarray)
