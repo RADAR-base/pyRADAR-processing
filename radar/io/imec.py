@@ -105,13 +105,20 @@ class ImecContiguous():
 
 
 class ImecDataset():
+    eps = pd.Timedelta(1)
+
     def __init__(self, path: str, signals: List[str]):
         folders = terminal_folders(path)
+        folders.sort()
         self._ctg_grps = [ImecContiguous(p, signals) for p in folders]
 
     @property
     def dask_dataframe(self):
-        return dd.concat([cg.dask_dataframe for cg in self._ctg_grps])
+        dfs = [cg.dask_dataframe for cg in self._ctg_grps]
+        for i in range(len(dfs)-1):
+            end = min(dfs[i].divisions[-1], dfs[i+1].divisions[0] - self.eps)
+            dfs[i] = dfs[i][:end]
+        return dd.concat(dfs)
 
 
 class ImecOldDataset():
@@ -122,7 +129,8 @@ class ImecOldDataset():
 
     @property
     def dask_dataframe(self):
-        return dd.concat([im.dask_dataframe for im in self._imec_files])
+        dfs = [im.dask_dataframe for im in self._imec_files]
+        return dd.concat(dfs)
 
 
 def imec_dataset(path: str, signals: List[str]):
@@ -168,7 +176,7 @@ def imec_old_all(path):
                                                          'ACC-Y',
                                                          'ACC-Z')),
         'imec_old_ecg': imec_old(path, signals=('ECG',)),
-        'imec_old_emg': imec_emg(path, signals=('EMG',)),
-        'imec_old_gsr': imec_gsr(path, signals=('GSR-1', 'GSR-2'))
+        'imec_old_emg': imec_old(path, signals=('EMG',)),
+        'imec_old_gsr': imec_old(path, signals=('GSR-1', 'GSR-2'))
     }
     return out
