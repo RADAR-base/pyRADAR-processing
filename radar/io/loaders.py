@@ -165,13 +165,17 @@ def get_data_func(name, ext, compression, isfile):
         return _data_load_funcs[name]
     if ext_comp in _data_load_funcs:
         return _data_load_funcs[ext_comp]
-
     if name == 'IMEC':
         from .imec import imec_old_all
         func = imec_old_all
+        _data_load_funcs['IMEC'] = func
     elif name == 'IMEC H5':
         from .imec import imec_h5_all
         func = imec_h5_all
+        _data_load_funcs['IMEC H5'] = func
+
+    if func:
+        return func
 
     if ext == 'csv':
         func = read_dd_generic(dd.read_csv, isfile, compression, '*.csv*')
