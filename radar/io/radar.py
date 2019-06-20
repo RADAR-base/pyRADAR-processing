@@ -59,8 +59,7 @@ def read_prmt_csv(dtype=None, timecols=None,
     if timedeltas is None:
         timedeltas = {}
 
-    dtype['key.projectId'] = 'category'
-    # dtype['key.userId'] = 'category'
+    dtype['key.projectId'] = object
 
     @read_csv_folder
     def read_csv(path, *args, **kwargs):

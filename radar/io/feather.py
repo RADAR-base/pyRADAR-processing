@@ -3,6 +3,7 @@
 Store a dask dataframe in a folder of multiple feather files.
 """
 import os
+from functools import singledispatch
 import pyarrow.feather as ft
 import pandas as pd
 import dask.dataframe as dd
@@ -11,6 +12,7 @@ from .core import glob_path_for_files
 from .generic import create_divisions
 
 
+@singledispatch
 def to_feather(df: pd.DataFrame, path: str) -> None:
     """ DataFrame to multi-file feather format. Uses the first row
     of first column as the file name. It is assumed to be a datetime.
@@ -32,6 +34,7 @@ def to_feather(df: pd.DataFrame, path: str) -> None:
     pd.DataFrame.to_feather(df, out_path)
 
 
+@to_feather.register(dd.DataFrame)
 def to_feather_dask(ddf: dd.DataFrame, path: str, compute: bool = True):
     """ DataFrame to multi-file feather format. Uses the first row
     of first column as the file name. It is assumed to be a datetime.
@@ -44,6 +47,7 @@ def to_feather_dask(ddf: dd.DataFrame, path: str, compute: bool = True):
     """
     if compute:
         ddf.map_partitions(to_feather, path, meta=object).compute()
+        return
     return ddf.map_partitions(to_feather, path, meta=object)
 
 
