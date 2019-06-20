@@ -2,10 +2,11 @@
 import numpy as np
 import pandas as pd
 from .filters import butterworth
+from typing import List, Tuple
 
 SEC = pd.Timedelta(1, 's')
 
-def calculate_drift(timeReceived):
+def calculate_drift(timeReceived: pd.Series) -> pd.Series:
     """ Calculate timedelta between timeRecieved and time.
     Parameters
     __________
@@ -21,11 +22,12 @@ def calculate_drift(timeReceived):
     return (timeReceived - timeReceived.index).astype('int64')
 
 
-def drift_filter(delta, freq=32):
+def drift_filter(delta: pd.Series, freq: float = 32) -> pd.Series:
     """ Filters the time drift series
     Finds the minimum value in rolling 120s sections.
     Params:
         delta (pd.Series[int64]): Series with timestamp index
+        freq (float): Unused
     Returns:
         pd.Series[float64]: filtered drift
     """
@@ -36,7 +38,7 @@ def drift_filter(delta, freq=32):
     return filt
 
 
-def get_segments(series):
+def get_segments(series: pd.Series) -> List[Tuple[int, int]]:
     """ Get contiguous segments. Splits on gaps in the time index > 0.5sec
     Params:
         series (pd.Series)
@@ -92,4 +94,5 @@ def correct_drift(df, inplace=True):
     segments = get_segments(drift)
     filtered = filter_segments(drift, segments)
     df.index = df.index + filtered.astype('timedelta64[ns]')
+    df = df.sort_index()
     return df
