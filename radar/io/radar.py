@@ -4,7 +4,7 @@ from typing import Callable, Dict
 import pandas as pd
 import dask.delayed as delayed
 import dask.dataframe as dd
-from .core import glob_path_for_files, files_newer_than
+from .core import glob_path_for_files
 from .generic import create_divisions
 from ..common import config
 from ..util.armt import melt
@@ -33,9 +33,6 @@ def read_csv_folder(func):
     def wrapper(path, *args, **kwargs):
         files = glob_path_for_files(path, '*.csv*')
         files.sort()
-        newer_than = kwargs.pop('files_newer_than', None)
-        if newer_than:
-            files = files_newer_than(files, newer_than)
         if not files:
             return None
         divisions = create_divisions(files)

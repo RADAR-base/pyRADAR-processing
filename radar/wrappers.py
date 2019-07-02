@@ -342,7 +342,6 @@ class ParticipantData(RadarObject):
         """
         self._parent = participant
         self._data = kwargs.pop('data', {})
-        self.files_newer_than = kwargs.pop('files_newer_than', None)
         paths = self._norm_paths(kwargs.pop('paths', None))
         for path in paths:
             self._search_path(path, **kwargs)
@@ -391,9 +390,6 @@ class ParticipantData(RadarObject):
                 self._data[k] = modals[k]
 
     def _load(self, name, path, **kwargs):
-        newer_than = self._get_attr_or_parents('files_newer_than')
-        if newer_than:
-            kwargs['files_newer_than'] = pd.Timestamp(newer_than).timestamp()
         data = load_data_path(path, **kwargs)
         if isinstance(data, dict):
             self._data.update(data)
