@@ -64,7 +64,6 @@ def read_feather_dask(path: str) -> dd.DataFrame:
         index = table.schema[0].name
         return table.schema.empty_table().to_pandas().set_index(index)
 
-    @delayed
     def read_pandas(path):
         return ft.read_feather(path)
 
@@ -72,7 +71,7 @@ def read_feather_dask(path: str) -> dd.DataFrame:
     paths.sort()
     meta = get_meta(paths[0])
     index = meta.index.name
-    delayed_objs = [read_pandas(p).set_index(index) for p in paths]
+    delayed_objs = [delayed(read_pandas)(p).set_index(index) for p in paths]
     divisions = create_divisions(paths)
     ddf = dd.from_delayed(delayed_objs, meta=meta, divisions=divisions)
     return ddf

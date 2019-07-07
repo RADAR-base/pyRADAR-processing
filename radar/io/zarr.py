@@ -108,4 +108,5 @@ def read_zarr(path: str, columns: List[str] = None) -> dd.DataFrame:
     ddf = dd.concat(cols, axis=1)
     if index is not None:
         ddf = ddf.set_index(index, sorted=True, divisions=divisions)
+    ddf.group = group
     return ddf
