@@ -8,7 +8,7 @@ from ..util.completion import completion_idx_has_data
 
 def completion_plot(completion, modalities, start, end, freq,
     ax=None, cmap=None, x_tick_mult=24, x_tick_fmt="%y-%m-%d %H:%M",
-    enrolment_date=None, events=None, event_radius=0):
+    enrolment_date=None, events=[], event_radius=0):
     """ Plots the completion array as a heatmap
     Parameters
     __________
@@ -55,34 +55,33 @@ def completion_plot(completion, modalities, start, end, freq,
     ax.hlines(N_y, 0, N_x, color='black', linewidth=2)
 
     # Events
-    if events:
-        for e_stamp_str,e_label in events:
-            try:
-                e_stamp_unix = float(e_stamp_str)
-                e_stamp = pd.Timestamp(e_stamp_unix, unit='s').tz_localize('UTC')
-            except:
-                # TODO: review usage of tz_localize()
-                e_stamp = pd.Timestamp(datetime.strptime(e_stamp_str, '%Y-%m-%d %H:%M:%S')).tz_localize('CET').tz_convert('UTC')
+    for e_stamp_str,e_label in events:
+        try:
+            e_stamp_unix = float(e_stamp_str)
+            e_stamp = pd.Timestamp(e_stamp_unix, unit='s').tz_localize('UTC')
+        except:
+            # TODO: review usage of tz_localize()
+            e_stamp = pd.Timestamp(datetime.strptime(e_stamp_str, '%Y-%m-%d %H:%M:%S')).tz_localize('CET').tz_convert('UTC')
 
-            if e_stamp < start or e_stamp > end: continue
+        if e_stamp < start or e_stamp > end: continue
 
-            log.debug("Event at {}: {}".format(e_stamp, e_label))
-            e_idx = (e_stamp - start)//td
+        log.debug("Event at {}: {}".format(e_stamp, e_label))
+        e_idx = (e_stamp - start)//td
 
-            e_slice = None
-            if event_radius:
-                e_start = max(0, (e_stamp - start - (td * event_radius))//td)
-                e_end = min(N_x-1, (e_stamp - start + (td * event_radius))//td)
-                e_slice = slice(e_start, e_end+1)
-                rect = patches.Rectangle((e_start, 0), e_end - e_start, N_y, linewidth=0.5, edgecolor='k', alpha=0.25, zorder=9)
-                ax.add_patch(rect)
+        e_slice = None
+        if event_radius:
+            e_start = max(0, (e_stamp - start - (td * event_radius))//td)
+            e_end = min(N_x-1, (e_stamp - start + (td * event_radius))//td)
+            e_slice = slice(e_start, e_end+1)
+            rect = patches.Rectangle((e_start, 0), e_end - e_start, N_y, linewidth=0.5, edgecolor='k', alpha=0.25, zorder=9)
+            ax.add_patch(rect)
 
-            has_all = completion_idx_has_data(completion, e_slice if e_slice else e_idx, requirement_function=all)
-            has_any = completion_idx_has_data(completion, e_slice if e_slice else e_idx, requirement_function=any)
+        has_all = completion_idx_has_data(completion, e_slice if e_slice else e_idx, requirement_function=all)
+        has_any = completion_idx_has_data(completion, e_slice if e_slice else e_idx, requirement_function=any)
 
-            if has_all: ax.vlines(e_idx, 0, N_y, color='green', linewidth=2, zorder=10)
-            elif has_any: ax.vlines(e_idx, 0, N_y, color='orange', linewidth=2, zorder=10)
-            else: ax.vlines(e_idx, 0, N_y, color='red', linewidth=2, zorder=10)
+        if has_all: ax.vlines(e_idx, 0, N_y, color='green', linewidth=2, zorder=10)
+        elif has_any: ax.vlines(e_idx, 0, N_y, color='orange', linewidth=2, zorder=10)
+        else: ax.vlines(e_idx, 0, N_y, color='red', linewidth=2, zorder=10)
 
     # Enrolment
     if enrolment_date:

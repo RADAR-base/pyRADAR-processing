@@ -76,8 +76,11 @@ def read_prmt_csv(dtype=None, timecols=None,
         if drop_duplicates:
             df = df.drop_duplicates(index)
         if index:
-            df = df.set_index(index)
-            df = df.sort_index()
+            if 'biovotion' in path:
+                df = df.set_index(index, drop=False)
+            else:
+                df = df.set_index(index)
+                df = df.sort_index()
         return df
     return read_csv
 
