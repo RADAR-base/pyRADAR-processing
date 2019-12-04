@@ -6,7 +6,7 @@ import numpy as np
 import dask.dataframe as dd
 from dask.bytes.utils import infer_compression, infer_storage_options
 from .core import get_fs
-from .radar import read_prmt_csv, armt_read_csv_funcs, schema_read_csv_funcs
+from .radar import PrmtCsvReader, armt_read_csv_funcs, schema_read_csv_funcs
 from .feather import read_feather_dask
 from ..generic import re_compile
 from ..common import log, config
@@ -147,7 +147,7 @@ def load_data_path(path, **kwargs):
                             if SCHEMA_REGEX.match(x)]
             if schema_files:
                 schema = schema_from_file(schema_files[0])
-                f = read_prmt_csv(dtype=schema.dtype(),
+                f = PrmtCsvReader(dtype=schema.dtype(),
                                   timecols=schema.timecols(),
                                   timedeltas=schema.timedeltas())
                 log.debug('Loaded schema from local file %s', schema_files[0])
@@ -228,7 +228,7 @@ if config['protocol']['url'] or config['protocol']['file']:
 
 
 # Fitbit temp
-_data_load_funcs['connect_fitbit_intraday_steps'] = read_prmt_csv(
+_data_load_funcs['connect_fitbit_intraday_steps'] = PrmtCsvReader(
     dtype={
         'value.time': float,
         'value.timeReceived': float,
@@ -238,7 +238,7 @@ _data_load_funcs['connect_fitbit_intraday_steps'] = read_prmt_csv(
     timecols=['value.time', 'value.timeReceived'],
     timedeltas={'value.timeInterval': 'timedelta64[s]'})
 
-_data_load_funcs['connect_fitbit_intraday_heart_rate'] = read_prmt_csv(
+_data_load_funcs['connect_fitbit_intraday_heart_rate'] = PrmtCsvReader(
     dtype={
         'value.time': float,
         'value.timeReceived': float,
@@ -248,7 +248,7 @@ _data_load_funcs['connect_fitbit_intraday_heart_rate'] = read_prmt_csv(
     timecols=['value.time', 'value.timeReceived'],
     timedeltas={'value.timeInterval': 'timedelta64[s]'})
 
-_data_load_funcs['connect_fitbit_sleep_stages'] = read_prmt_csv(
+_data_load_funcs['connect_fitbit_sleep_stages'] = PrmtCsvReader(
     dtype={
         'value.dateTime': object,
         'value.timeReceived': float,
@@ -259,7 +259,7 @@ _data_load_funcs['connect_fitbit_sleep_stages'] = read_prmt_csv(
     timedeltas={'value.duration': 'timedelta64[s]'},
     index='dateTime')
 
-_data_load_funcs['connect_fitbit_sleep_classic'] = read_prmt_csv(
+_data_load_funcs['connect_fitbit_sleep_classic'] = PrmtCsvReader(
     dtype={
         'value.dateTime': object,
         'value.timeReceived': float,
@@ -271,13 +271,25 @@ _data_load_funcs['connect_fitbit_sleep_classic'] = read_prmt_csv(
     index='dateTime')
 
 
-_data_load_funcs['connect_fitbit_time_zone'] = read_prmt_csv(
+_data_load_funcs['connect_fitbit_time_zone'] = PrmtCsvReader(
     dtype={
         'value.timeReceived': float,
         'value.timeZoneOffset': int
     },
     timecols=['value.timeReceived'],
     index='timeReceived')
+
+_data_load_funcs['connect_fitbit_intraday_calories'] = PrmtCsvReader(
+    dtype={
+        'value.time': float,
+        'value.timeReceived': float,
+        'value.timeInterval': int,
+        'value.calories': float,
+        'value.level': int,
+        'value.mets': float
+    },
+    timecols=['value.time', 'value.timeReceived'],
+    index='time')
 
 
 def read_processed_audio():
@@ -295,7 +307,7 @@ def read_processed_audio():
              convert_data_delayed, meta=('data', object))
         return df
 
-    delayed_read = read_prmt_csv(timecols=['value.time', 'value.timeReceived'],
+    delayed_read = PrmtCsvReader(timecols=['value.time', 'value.timeReceived'],
                                  dtype={'value.data': object})
     return read_csv
 

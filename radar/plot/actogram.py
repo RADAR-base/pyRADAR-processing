@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 week = pd.Timedelta('7d')
-def weekly_plot(dataframe, datacol='value.x', **kwargs):
+def weekly_plot(dataframe, datacol='x', **kwargs):
     groups = dataframe.groupby([dataframe.index.year, # dataframe.index.month,
                                 dataframe.index.week])
     n = len(groups)

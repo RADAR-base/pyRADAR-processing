@@ -109,15 +109,18 @@ class RadarSchema():
             return nptype
         return [convert_type(x) for x in self.get_col_types()]
 
+    @property
     def dtype(self):
         return {k: v for k, v in
                 zip(self.get_col_names(), self.get_col_py_types())}
 
+    @property
     def timecols(self):
         return [name for name, doc in
                 zip(self.get_col_names(), self.get_col_info_by_key('doc'))
                 if 'timestamp' in doc.lower()]
 
+    @property
     def timedeltas(self):
         def get_dtype(doc):
             dtype = 'timedelta64[s]'

@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 import dask.dataframe as dd
-
 from ..common import log
+
 
 def data_completion(ddf, start, end, freq='1h', enrolment_date=None):
     """ Returns a vector with elements representing whether data is
@@ -15,8 +15,9 @@ def data_completion(ddf, start, end, freq='1h', enrolment_date=None):
     start: pd.Timestamp / np.datetime64
     end: pd.Timestamp / np.datetime64
     freq: str
-        Timedelta string determining the frequency (i.e. resolution) of the completion check.
-        Anything other than the default '1h' resamples the data which may take significantly more time.
+        Timedelta string determining the frequency (i.e. resolution) of the
+        completion check. Anything other than the default '1h' resamples the
+        data which may take significantly more time.
     enrolment_date: pd.Timestamp / np.datetime64 (optional)
         Hours before this date are assigned -1.
 
@@ -26,8 +27,10 @@ def data_completion(ddf, start, end, freq='1h', enrolment_date=None):
         Array where 1 corresponds to present data, 0 to missing data,
         and -1 to prior to enrolment.
     """
-    vec = pd.Series(index=pd.date_range(start=start, end=end, freq=freq), dtype=int)
-    if vec.empty or ddf is None : return []
+    vec = pd.Series(index=pd.date_range(start=start, end=end, freq=freq),
+                    dtype=int)
+    if vec.empty or ddf is None:
+        return []
 
     if freq == '1h':
         idx = pd.DatetimeIndex(ddf.divisions)
@@ -36,17 +39,17 @@ def data_completion(ddf, start, end, freq='1h', enrolment_date=None):
     else:
         resampled = ddf.resample(freq).first().dropna()
         resampled = resampled.compute()
-        for i,v in vec.iteritems():
-            if i in resampled.index: vec.loc[i] = 1
+        for i, v in vec.iteritems():
+            if i in resampled.index:
+                vec.loc[i] = 1
 
     if enrolment_date:
         vec.loc[:enrolment_date] = -1
     return vec.values
 
 
-
-
-def ptc_completion(ptc, start, end, freq='1h', modalities=None, enrolment_date=None):
+def ptc_completion(ptc, start, end, freq='1h',
+                   modalities=None, enrolment_date=None):
     """ Returns a data completion array and a list of modality names.
     Parameters
     __________
@@ -54,8 +57,9 @@ def ptc_completion(ptc, start, end, freq='1h', modalities=None, enrolment_date=N
     start: pd.Timestamp / np.datetime64
     end: pd.Timestamp / np.datetime64
     freq: str
-        Timedelta string determining the frequency (i.e. resolution) of the completion check.
-        Anything other than the default '1h' resamples the data which may take significantly more time.
+        Timedelta string determining the frequency (i.e. resolution) of the
+        completion check. Anything other than the default '1h' resamples the
+        data which may take significantly more time.
     modalities: list of str
     enrolment_date: pd.Timestamp / np.datetime64
 
@@ -72,14 +76,12 @@ def ptc_completion(ptc, start, end, freq='1h', modalities=None, enrolment_date=N
         modalities = sorted(list(ptc.data.keys()))
     completion = np.zeros((len(modalities), 1+(end-start)//pd.Timedelta(freq)), dtype=int)
     for i, dname in enumerate(modalities):
-        if dname not in ptc.data or not isinstance(ptc.data[dname], dd.DataFrame):# or len(ptc.data[dname]) == 0:
+        if dname not in ptc.data or not isinstance(ptc.data[dname], dd.DataFrame):  # or len(ptc.data[dname]) == 0:
             log.debug("Participant %s has no recorded %s", ptc.name, dname)
             continue
         log.debug("Processing %s for participant %s", dname, ptc.name)
         completion[i, :] = data_completion(ptc.data[dname], start, end, freq, enrolment_date=enrolment_date)
     return completion, modalities
-
-
 
 
 def completion_idx_has_data(completion, idx, modalities=None, filter=None, requirement_function=any):

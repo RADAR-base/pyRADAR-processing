@@ -24,8 +24,8 @@ def to_zarr(x, path):
 
 @to_zarr.register(pd.DataFrame)
 def df_to_zarr(df: pd.DataFrame, path: str, group=None,
-               overwrite=False, append=False, **kwargs):
-    group = get_group(path, group, overwrite)
+               overwrite=False, append=False, zpath='/', **kwargs):
+    group = get_group(path, group, overwrite)[zpath]
     group.attrs['type'] = 'dataframe'
     if not isinstance(df.index, pd.RangeIndex):
         index = df.index.name
@@ -43,7 +43,7 @@ def df_to_zarr(df: pd.DataFrame, path: str, group=None,
 @to_zarr.register(dd.DataFrame)
 def dask_to_zarr(ddf: dd.DataFrame, path: str, group=None,
                  overwrite=False, append=True, chunks=(16777216,),
-                 compute=True):
+                 compute=True, zpath='/'):
     def get_divisions(group, index):
         index = index if index is not None else 'index'
         nchunks = group[index].nchunks
@@ -58,7 +58,7 @@ def dask_to_zarr(ddf: dd.DataFrame, path: str, group=None,
         group = get_group(path, group, overwrite)
         for p in ddf.partitions:
             df_to_zarr(p.compute(), group=group, path=path,
-                       append=append, chunks=chunks)
+                       append=append, chunks=chunks, zpath=zpath)
         group['.divisions'] = get_divisions(group, ddf.index.name)
 
     delayed_write = ddf_to_zarr(group)

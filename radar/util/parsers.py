@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import numpy as np
+
+
 def biovotion_sort_upsample(df, time_idx='value.time'):
     df = df.sort_index(ascending=False).sort_values(by=time_idx, kind='mergesort')
     lens = df.groupby('value.time').apply(len).values

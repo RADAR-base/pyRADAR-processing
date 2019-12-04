@@ -185,7 +185,7 @@ def from_url(url):
 def from_path(path):
     with open(path, 'r') as f:
         protocols_file = json.load(f)
-    protocols = {p['name']: Protocol(p) for p in protocols['protocols']}
+    protocols = {p['name']: Protocol(p) for p in protocols_file['protocols']}
     return protocols
 
 
