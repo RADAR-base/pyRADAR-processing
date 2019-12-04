@@ -4,10 +4,14 @@ from functools import wraps
 import numpy as np
 import pandas as pd
 from . import validators
+from ..generic import FunctionRegistry
+
+
+CLEANERS = FunctionRegistry()
 
 
 def last(x):
-    """ Returns the last element of a series
+    """ Returns the last element of a series.
     Params:
         x (pd.Series)
     Returns:
@@ -17,8 +21,7 @@ def last(x):
 
 
 def validate(validator):
-    """ Wraps function to run a validator on dataframe input
-    """
+    """ Wrapper to run a validator on dataframe input."""
     def decorator(func):
         @wraps(func)
         def wrap(df, *args, **kwargs):
@@ -28,6 +31,7 @@ def validate(validator):
     return decorator
 
 
+@CLEANERS.register('android_phone_contacts')
 @validate(validators.android_phone_contacts)
 def android_phone_contacts(df: pd.DataFrame) -> pd.DataFrame:
     """ Returns daily aggregate of valid phone_contacts.
@@ -53,6 +57,7 @@ def android_phone_contacts(df: pd.DataFrame) -> pd.DataFrame:
     return df.groupby(df.index.floor('1D')).agg(aggregations)
 
 
+@CLEANERS.register('questionnaire_phq')
 @validate(validators.questionnaire_phq8)
 def questionnaire_phq8(df: pd.DataFrame) -> pd.DataFrame:
     """ Returns a dataframe with only validated answers
@@ -64,6 +69,7 @@ def questionnaire_phq8(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+@CLEANERS.register('questionnaire_rses')
 @validate(validators.questionnaire_rses)
 def questionnaire_rses(df: pd.DataFrame) -> pd.DataFrame:
     """ Returns a dataframe with only validated answers
@@ -75,6 +81,7 @@ def questionnaire_rses(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+@CLEANERS.register('connect_fitbit_sleep_stages')
 def connect_fitbit_sleep_stages(df: pd.DataFrame) -> pd.Series:
     """ Cleans fitbit_sleep_stages dataframe
     Maps UNKNOWN -> AWAKE (bug in early connector)
@@ -85,11 +92,3 @@ def connect_fitbit_sleep_stages(df: pd.DataFrame) -> pd.Series:
     """
     df.loc[df['level'] == 'UNKNOWN', 'level'] = 'AWAKE'
     return df
-
-
-CLEANERS = {
-    'android_phone_contacts': android_phone_contacts,
-    'connect_fitbit_sleep_stages': connect_fitbit_sleep_stages,
-    'questionnaire_phq8': questionnaire_phq8,
-    'questionnaire_rses': questionnaire_rses
-}
