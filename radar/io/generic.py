@@ -140,28 +140,3 @@ class FakeDatetimeArray():
         if stop < 0:
             stop = 0
         return start, stop, step
-
-
-def file_datehour(fn: str):
-    """ Converts the RADAR CSV output filename to a Timestamp
-    Params:
-        fn (str): The filename
-    Returns:
-        pd.Timestamp
-    """
-    return pd.Timestamp(os.path.normpath(fn).split(os.path.sep)[-1][0:13].replace('_', 'T'), tz='UTC')
-
-
-def create_divisions(files: List[str]) -> List[np.datetime64]:
-    """ Create Dask Dataframe datetime divisions from RADAR CSV file names
-    Params:
-        files (List[str]): List of file names
-    Returns:
-        List[np.datetime64]: Dask partition divisions
-    """
-    try:
-        divisions = [file_datehour(fn) for fn in files]
-        divisions += [file_datehour(files[-1]) + pd.Timedelta(1, 'h')]
-    except (IndexError, ValueError):
-        divisions = None
-    return divisions

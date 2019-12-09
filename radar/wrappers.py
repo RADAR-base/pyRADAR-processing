@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
-import os
+"""A module containing the base classes for RADAR.
+
+Classes corresponding to the project, participant, and data
+"""
 from collections.abc import MutableMapping, KeysView, ItemsView, ValuesView
-import pandas as pd
+from datetime import datetime
 from fsspec import filesystem
 from fsspec.utils import infer_storage_options
-from . import config
-from .generic import update
-from .common import abs_path, log
-from .io.loaders import search_project_dir, search_dir_for_data, load_data_path
+import pandas as pd
+import dask.dataframe as dd
+from .util.specifications import specifications
+from .util.schemas import schemas
 
 
 class RadarObject(MutableMapping):
     _keys_view = KeysView
     _items_view = ItemsView
     _values_view = ValuesView
+
     def __init__(self, path, populate=False, parent=None, name=None, **kwargs):
         self.parent = parent
         self._subobject_class = RadarObject
@@ -26,17 +30,22 @@ class RadarObject(MutableMapping):
         if populate:
             self._populate_store(populate=True)
         self._populated = populate
+
     def _list_subobjects(self):
         return self.fs.listdir(self.path)
+
     def _populate_store(self, populate=False):
         paths = self._list_subobjects()
         for p in paths:
             if p['type'] == 'directory':
                 basename = p['name'].split(self.fs.sep)[-1]
-                self.store[basename] = self._subobject_class(p['name'], parent=self)
+                self.store[basename] = \
+                    self._subobject_class(p['name'], parent=self)
         self._populated = True
+
     def __setitem__(self, key, val):
         self.store[key] = val
+
     def __getitem__(self, key):
         if not self._populated:
             self._populate_store()
@@ -47,26 +56,34 @@ class RadarObject(MutableMapping):
             base_key = split_key[0]
             sub_key = '/'.join(split_key[1:])
             return self.store[base_key][sub_key]
+
     def __delitem__(self, key):
         del self.store[key]
+
     def __iter__(self):
         return iter(self.store)
+
     def __len__(self):
         return len(self.store)
+
     def keys(self):
         if not self._populated:
             self._populate_store()
         return self._keys_view(self)
+
     def items(self):
         if not self._populated:
             self._populate_store()
         return self._items_view(self)
+
     def values(self):
         if not self._populated:
             self._populate_store()
         return self._values_view(self)
+
     def _ipython_key_completions_(self):
         return list(self.keys())
+
     def _get_attr_or_parents(self, attr):
         if hasattr(self, attr) and getattr(self, attr) is not None:
             res = getattr(self, attr)
@@ -75,18 +92,23 @@ class RadarObject(MutableMapping):
         else:
             res = self.parent._get_attr_or_parents(attr)
         return res
+
     def __str__(self):
         return (self.__class__.__module__ + '.' +
                 self.__class__.__name__ + ': "' + self.name + '"')
+
     @property
     def schemas(self):
         return self._get_attr_or_parents('_schemas')
+
     @property
     def specifications(self):
         return self._get_attr_or_parents('_specifications')
+
     @property
     def armt_definitions(self):
         return self._get_attr_or_parents('_armt_definitions')
+
     @property
     def armt_protocols(self):
         return self._get_attr_or_parents('_armt_protocols')
@@ -127,6 +149,7 @@ class Project(RadarObject):
         self._armt_protocols = kwargs.get('armt_protocols')
         self._whitelist = kwargs.get('participants')
         self._blacklist = kwargs.get('blacklist', [])
+
     def _list_subobjects(self):
         all_paths = self.fs.listdir(self.path)
         whitelist = [p['name'] for p in all_paths] if self._whitelist is None \
@@ -135,14 +158,17 @@ class Project(RadarObject):
         return [p for p in all_paths if
                 p['name'] in whitelist and
                 p['name'] not in blacklist]
+
     @property
     def participants(self):
         return self.keys()
+
 
 class ProjectKeysView(KeysView):
     def __repr__(self):
         keys_str = ', '.join(self._mapping.participants)
         return 'ProjectParticipantKeys[' + keys_str + ']'
+
 
 class ProjectItemsView(ItemsView):
     def __repr__(self):
@@ -173,10 +199,12 @@ class Participant(RadarObject):
     def data(self):
         return self.keys()
 
+
 class ParticipantKeysView(KeysView):
     def __repr__(self):
         keys_str = ', '.join(self._mapping.data)
         return 'ParticipantDataKeys[' + keys_str + ']'
+
 
 class ParticipantItemsView(ItemsView):
     def __repr__(self):
@@ -192,6 +220,70 @@ class ParticipantValuesView(KeysView):
                               for name in self._mapping.data])
         return 'ParticipantDataValues[' + vals_str + ']'
 
+
 class RadarData():
-    def __init__(self, *args, **kwargs):
+    def __init__(self, path, parent=None, name=None, *args, **kwargs):
+        self.parent = parent
+        self.files = kwargs.pop('files', None)
+        specs = infer_storage_options(path)
+        self.path = specs.pop('path')
+        self.fs = filesystem(**specs)
+        self.name = name if name else self.path.split(self.fs.sep)[-1]
+        self.specification = kwargs.get('specification',
+                                        specifications.get(self.name))
+        if self.specification is not None:
+            self.schema = schemas.get(self.specification.value_schema)
+
+    def _populate_files(self):
+        files = [self.fs.open(f)
+                 for f in self.fs.glob(self.path + self.fs.sep + '*.csv.gz')]
+        self.files = files
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            if key.step:
+                raise KeyError('Step not supported')
+            return self.between_dates(key.start, key.stop)
+        else:
+            raise KeyError('Only datetime slices currently supported')
+
+    def between_dates(self, start=None, end=None):
+        def meets_cond(epoch):
+            return start < epoch < end
+
+        start = float('-inf') if start is None else to_ts(start)
+        end = float('+inf') if end is None else to_ts(end)
+        return self._subset([f for f in self.files if
+                             meets_cond(fsfilename_date)])
+
+    def _subset(self, files):
+        return RadarData(self.path, self.parent, self.name, files=files)
+
+    def to_dask_dataframe(self):
+        return dd.DataFrame()
+
+    def to_pyarrow(self):
         pass
+
+    def to_pandas(self):
+        return self.to_dask_dataframe.compute()
+
+    def to_numpy(self):
+        return self.to_dask_dataframe.compute().values
+
+
+def filename_to_epoch(fn):
+    return datetime.strptime(fn[:13], '%Y%m%d_%H%M').timestamp()
+
+
+def fn_from_fsspec(f, sep):
+    return f.details['name'].split(f.fs.sep)[-1]
+
+
+def fsfilename_date(f):
+    fn = fn_from_fsspec(f)
+    return filename_to_epoch(fn)
+
+
+def to_ts(timestamp_like):
+    return pd.Timestamp(timestamp_like).value / 1e9

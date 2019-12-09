@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
+from typing import Dict
 import os
 import json
 import glob
 import numpy as np
 import pandas as pd
+import avro.schema
 from ..defaults import config, schemas
+
+from functools import lru_cache
 
 AVRO_NP_TYPES = {
     'null': 'object',
     'boolean': 'bool',
-    'int': 'int32',
-    'long': 'int64',
+    'int': 'Int32',
+    'long': 'Int64',
     'float': 'float32',
     'double': 'float64',
     'bytes': 'bytes',
@@ -18,121 +22,93 @@ AVRO_NP_TYPES = {
     'enum': 'object',
 }
 
+DATETIME_FIELDS = {'time', 'timeReceived', 'dateTime'}
+TIMEDELTA_FIELDS = {'duration'}
+
 BLANK_KEY = {"namespace": "NoKey", "fields": []}
 
 
+def _cache(cls):
+    cache = {}
+    def wrapper(scm):
+        if scm.name not in cache:
+            cache[scm.name] = cls(scm)
+        return cache[scm.name]
+    return wrapper
+
+
+@_cache
 class RadarSchema():
-    """
-    A class for use with RADAR-base key-value pair schemas. Initialise with a
-    json string representation of the schema.
-    """
-
-    def __init__(self, schema_json, key_json=None):
-        """
-        This class is initiated with a json dict representation of a
-        RADAR-base schema.
-        Parameters
-        __________
-        schema_json: dict
-            A json dict representation of a key-value pair RADAR-base schema
-            May also only represent the value section of the schema.
-        key_json: dict (optional)
-            A json dict representation of a key RADAR-base schema
-        __________
-        """
-        self.schema = schema_from_value_or_schema(schema_json, key_json)
-
-    def get_col_info(self, func=lambda x: x, *args):
-        """
-        Values from schema columns and their parent fields can be retrieved by
-        a given function.
-        """
-        return [func(col, field, *args)
-                for field in self.schema['fields']
-                for col in field['type']['fields']]
-
-    def get_col_info_by_key(self, *keys):
-        """
-        Gets values from a schema column by its dict key. Multiple keys can be
-        supplied for nested values.
-        """
-        def get_info_rec(col, par, *keys):
-            return col[keys[0]] if len(keys) == 1 else \
-                   get_info_rec(col.props[keys[0]], par, *keys[1:])
-        return self.get_col_info(get_info_rec, *keys)
-
-    def get_col_names(self,):
-        """
-        Returns an array of column names for the csv created by the schema
-        """
-        def get_name(col, parent):
-            return parent['name'] + '.' + col['name']
-        return self.get_col_info(func=get_name)
-
-    def get_col_types(self,):
-        """
-        Returns an array of strings naming Avro datatypes for each csv column
-        created by the schema
-        """
-        def get_type(col, *args):
-            typeval = col['type']
-            typeval_type = type(typeval)
-            if typeval_type is list:
-                typeval = (t for t in typeval if not t == 'null')
-                return next(typeval)
-            else:
-                return typeval
-        return self.get_col_info_by_key('type')
-
-    def get_col_py_types(self):
-        """
-        Returns an array of the equivilent numpy datatypes for the csv file for
-        the schema
-        """
-        def convert_type(dtype):
-            nptype = np.object
-            if isinstance(dtype, list):
-                if 'null' in dtype:
-                    dtype.remove('null')
-                if len(dtype) == 1:
-                    if dtype[0] in ('float', 'double'):
-                        nptype = AVRO_NP_TYPES[dtype[0]]
-                    elif dtype[0] in ('int', 'long'):
-                        nptype = 'Int64'
-            elif isinstance(dtype, dict):
-                if dtype['type'] == 'enum':
-                    nptype = pd.api.types.CategoricalDtype(dtype['symbols'])
-                else:
-                    nptype = AVRO_NP_TYPES.get(dtype['type'], np.object)
-            else:
-                nptype = AVRO_NP_TYPES.get(dtype, np.object)
-            return nptype
-        return [convert_type(x) for x in self.get_col_types()]
-
-    @property
-    def dtype(self):
-        return {k: v for k, v in
-                zip(self.get_col_names(), self.get_col_py_types())}
-
-    @property
-    def timecols(self):
-        return [name for name, doc in
-                zip(self.get_col_names(), self.get_col_info_by_key('doc'))
-                if 'timestamp' in doc.lower()]
-
-    @property
-    def timedeltas(self):
+    def _get_timedelta_columns(self):
         def get_dtype(doc):
             dtype = 'timedelta64[s]'
             if 'milli' in doc:
                 dtype = 'timedelta64[ms]'
-            if 'micro' in doc:
+            elif 'micro' in doc:
                 dtype = 'timedelta64[us]'
             return dtype
+        return {name: get_dtype(field.avro.doc.lower())
+                for name, field in self.fields.items()
+                if 'duration' in name.lower()
+                or 'interval' in name.lower()}
+    def __init__(self, avro_schema: avro.schema.RecordSchema):
+        self.avro = avro_schema
+        self.fields = parse_schema_fields(avro_schema)
+        field_names = set(self.fields)
+        self.timecols = field_names.intersection(DATETIME_FIELDS)
+        self.timedeltas = self._get_timedelta_columns()
+        self.dtypes = {'value.' + k: v.nptype for k, v in self.fields.items()
+                       if v.nptype is not None}
 
-        return {name: get_dtype(doc.lower()) for name, doc in
-                zip(self.get_col_names(), self.get_col_info_by_key('doc'))
-                if 'duration' in name.lower() or 'interval' in name.lower()}
+
+class SchemaField():
+    def convert_type(self, dtype):
+        if isinstance(dtype, avro.schema.UnionSchema):
+            list_dtype = dtype.to_json()
+            if 'null' in list_dtype:
+                list_dtype.remove('null')
+            if len(list_dtype) == 1:
+                if list_dtype[0] in ('int', 'long'):
+                    return 'Int64'
+                elif list_dtype[0] == 'boolean':
+                    return 'object'
+                else:
+                    return AVRO_NP_TYPES.get(list_dtype[0])
+        elif isinstance(dtype, avro.schema.EnumSchema):
+            return pd.api.types.CategoricalDtype(dtype.symbols)
+        return AVRO_NP_TYPES.get(dtype.type)
+    def __init__(self, field: avro.schema.Field):
+        self.avro = field
+        self.nptype = self.convert_type(field.type)
+
+
+def parse_schema_fields(schema: avro.schema.RecordSchema, namespace=''):
+    def get_schema_if_record(field: avro.schema.Field):
+        if field.type.type == 'record':
+            return field.type
+        if field.type.type == 'union':
+            for r in field.type.schemas:
+                if r.type == 'record':
+                    return r
+    def get_schema_if_array(field: avro.schema.Field):
+        if field.type.type == 'array':
+            return field.type
+        if field.type.type == 'union':
+            for r in field.type.schemas:
+                if r.type == 'array':
+                    return r
+    out: Dict[str, SchemaField] = {}
+    for field in schema.fields:
+        rec = get_schema_if_record(field)
+        arr = get_schema_if_array(field)
+        name = namespace + field.name
+        if rec:
+            out.update(parse_schema_fields(rec, name + '.'))
+        elif arr:
+            out.update(parse_schema_fields(arr.items, name + '.\d+.'))
+        else:
+            out[name] = SchemaField(field)
+    return out
 
 
 def schema_from_value_or_schema(schema_json, key_json=None):
@@ -200,14 +176,3 @@ def schema_from_file(path, key_path=None):
         key_json = None
     return RadarSchema(scm_json, key_json=key_json)
 
-
-def schemas_from_git(path, key=None):
-    raise NotImplementedError
-
-
-def schema_from_url(value_url, key_url=None):
-    raise NotImplementedError
-
-
-if config.schema.dir:
-    schemas.update(schemas_from_commons(config.schema.dir, config.schema.key))

@@ -3,14 +3,14 @@ import collections
 from functools import lru_cache, singledispatch, update_wrapper
 
 
-class FunctionRegistry(dict):
-    def register(self, name, func=None):
+class Registry(dict):
+    def register(self, name, val=None):
         def wrapper(func):
             self[name] = func
-        if func is None:
+        if val is None:
             return wrapper
         else:
-            self[name] = func
+            self[name] = val
 
 
 def update(d, u):

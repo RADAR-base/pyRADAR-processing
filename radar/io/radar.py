@@ -1,89 +1,92 @@
 #!/usr/bin/env python3
-from functools import wraps
 from typing import Callable, Dict
+import dateutil
+from datetime import datetime
+import numpy as np
 import pandas as pd
-import pyarrow.csv as pcsv
-import dask.delayed as delayed
-import dask.dataframe as dd
-from .core import glob_path_for_files
-from .generic import create_divisions
 from ..common import config
-from ..util.armt import melt
+
 
 DT_MULT = int(1e9)
 
 
 class RadarCsvReader():
-    def __init__(self, dtype=None, timecols=None,
-                 timedeltas=None, index=config['io']['index']):
-        self.dtype = dtype if dtype else {}
-        self.timecols = timecols if timecols else {}
-        self.timedeltas = timedeltas if timedeltas else {}
-        self.index = index
+    def __init__(self, dtype=None, column_processors=None,
+                 has_array_fields=True):
+        self.dtype = dtype
+        self.column_processors = column_processors if column_processors else {}
+        self.has_array_fields = has_array_fields
 
-    def __call__(self, path, **kwargs):
-        files = sorted(glob_path_for_files(path, '*.csv*'))
-        if not files:
-            return None
-        divisions = create_divisions(files)
-        delayed_files = [delayed(self.read_csv)(fn, **kwargs)
-                         for fn in files]
-        df = dd.from_delayed(delayed_files, divisions=divisions)
-        if df.divisions == (None, None):
-            df.divisions = (df.index.head()[0], df.tail().index[-1])
-        return df
-
-    def read_csv(self, p, *args, **kwargs):
-        data = pd.read_csv(p, dtype=self.dtype, **kwargs)
-        return data
-
-
-class PrmtCsvReader(RadarCsvReader):
-    drop_duplicates = True
-    rename_columns = True
-    drop_unspecified = True
-
-    def read_csv(self, p, *args, **kwargs):
-        df = pd.read_csv(p, dtype=self.dtype)
-        df[self.timecols] = df[self.timecols].apply(convert_to_datetime)
-        for col, deltaunit in self.timedeltas.items():
-            df[col] = df[col].astype('Int64').astype(deltaunit)
-        if self.drop_unspecified:
-            extracols = [c for c in df.columns
-                         if c not in self.dtype and c[:3] != 'key']
-            df = df.drop(columns=extracols)
-        if self.rename_columns:
-            df.columns = [c.split('.')[-1] for c in df.columns]
-        if self.drop_duplicates:
-            df = df.drop_duplicates(self.index)
-        if self.index:
-            df = df.set_index(self.index)
-            df = df.sort_index()
+    def __call__(self, f):
+        df = pd.read_csv(f, dtype=self.dtype, parse_dates=False)
+        df.columns = ['.'.join(c.split('.')[1:]) for c in df.columns]
+        for c, processor in self.column_processors.items():
+            df[c] = processor(df[c])
+        if self.has_array_fields:
+            df = _melt_array_fields(df)
+        index = choose_index(df.columns)
+        if index:
+            df = df.set_index(index)
         return df
 
 
-class ArmtCsvReader(RadarCsvReader):
-    def read_csv(self, path, *args, **kwargs):
-        df = pd.read_csv(path, dtype=object, *args, **kwargs)
-        df = df.drop_duplicates('value.time')
-        df = melt(df)
-        if 'value.timeNotification' not in df:
-            df['value.timeNotification'] = pd.np.NaN
-        for col in ('value.time', 'value.timeCompleted',
-                    'startTime', 'endTime', 'value.timeNotification'):
-            df[col] = pd.DatetimeIndex((DT_MULT * df[col].astype('float')),
-                                       tz='UTC')
-        df['arrid'] = df.index
-        if 'questionId' not in df:
-            df['questionId'] = ''
-        df.columns = [c.split('.')[-1] for c in df.columns]
-        df = df.set_index(self.index)
-        df = df.sort_index(kind='mergesort')
-        df = df[['projectId', 'sourceId', 'userId',
-                 'questionId', 'startTime', 'endTime',
-                 'value', 'name', 'timeCompleted',
-                 'timeNotification', 'version', 'arrid']]
-        return df
+def choose_index(columns):
+    for c in ['time', 'dateTime', 'timeReceived']:
+        if c in columns:
+            return c
+    return None
+
+
+def find_array_columns(columns):
+    def is_array_column(c):
+        if len(c.split('.')) > 2:
+            return True
+        return False
+    id_vars = []
+    arr_vars = []
+    for c in columns:
+        if is_array_column(c):
+            arr_vars.append(c)
+        else:
+            id_vars.append(c)
+    return id_vars, arr_vars
+
+
+def _melt_array_fields(df):
+    def melt_row(row, ids):
+        melt = row.melt(id_vars=ids)
+        melt['arrid'] = [(lambda x: x[-2])(x)
+                         for x in melt['variable'].str.split('.')]
+        melt['field'] = [(lambda x: x[-1])(x)
+                         for x in melt['variable'].str.split('.')]
+        col_data = [(x[0], x[1]['value'].values)
+                    for x in melt.groupby('field')]
+        melt = pd.DataFrame([x[1][ids].iloc[0] for x in melt.groupby('arrid')])
+        melt = melt.reset_index(drop=True)
+        for col, data in col_data:
+            melt[col] = data
+        return melt
+    id_vars, arr_vars = find_array_columns(df.columns)
+    if any(id_vars):
+        df = pd.concat([melt_row(df[i:i+1], id_vars)
+                        for i in range(len(df))], sort=True)
+    return df
+
+
+def date_parser(series):
+    """Convert an array of floats or a string to a datetime object.
+    Params:
+        series (np.ndarray[float], str)
+    Returns:
+        np.ndarray[M8[ns]] / datetime.datetime
+    """
+    if isinstance(series, np.ndarray):
+        ts = (series * 1e9).astype('M8[ns]')
+    elif isinstance(series, np.float64):
+        ts = datetime.fromtimestamp(series)
+    elif isinstance(series, str):
+        ts = dateutil.parser.parse(series)
+    return ts
 
 
 def is_numeric(series):
@@ -100,25 +103,3 @@ def convert_to_datetime(series):
     if is_numeric(series):
         return pd.DatetimeIndex(DT_MULT * series, tz='UTC')
     return pd.DatetimeIndex(pd.to_datetime(series))
-
-
-def schema_read_csv_funcs(schemas):
-    """
-    Adds read_csv functions for each schema name to the _data_load_funcs
-    in radar.io.generic
-    Args:
-        schemas (dict): Dictionary containing keys of schema names
-            with RadarSchema values
-    """
-    out = {}
-    for name, scm in schemas.items():
-        out[name] = PrmtCsvReader(scm.dtype, scm.timecols, scm.timedeltas)
-    return out
-
-
-def armt_read_csv_funcs(protocol) -> Dict[str, Callable]:
-    out = {}
-    for armt in protocol.values():
-        name = armt.questionnaire.avsc + '_' + armt.questionnaire.name
-        out[name] = ArmtCsvReader()
-    return out
