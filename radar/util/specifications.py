@@ -106,7 +106,7 @@ def specifications_from_directory(path=config.specifications.dir):
     ymls = []
     for fn in files:
         with open(fn) as f:
-            ymls.append(yaml.load(f))
+            ymls.append(yaml.load(f, yaml.SafeLoader))
     return ProjectSpecs([DeviceSpec(y) for y in ymls])
 
 def specifications_from_github(repo_owner=config.specifications.github_owner,
@@ -128,10 +128,5 @@ def specifications_from_github(repo_owner=config.specifications.github_owner,
 
     folders = ('active', 'connector', 'monitor', 'passive')
     files = [f['path'] for folder in folders for f in ls(folder).json()]
-    ymls = [yaml.load(dl(spec)) for spec in files]
+    ymls = [yaml.load(dl(spec), yaml.SafeLoader) for spec in files]
     return ProjectSpecs([DeviceSpec(y) for y in ymls])
-
-if config.specifications.dir:
-    specifications.update(specifications_from_directory())
-elif config.specifications.git:
-    specifications.update(specifications_from_github())

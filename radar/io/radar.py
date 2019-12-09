@@ -4,29 +4,36 @@ import dateutil
 from datetime import datetime
 import numpy as np
 import pandas as pd
-from ..common import config
 
 
 DT_MULT = int(1e9)
 
 
 class RadarCsvReader():
-    def __init__(self, dtype=None, column_processors=None,
-                 has_array_fields=True):
-        self.dtype = dtype
+    def __init__(self, dtypes=None, column_processors=None,
+                 has_array_fields=True, timecols=tuple(),
+                 replace_dots=True):
+        self.dtypes = dtypes
         self.column_processors = column_processors if column_processors else {}
         self.has_array_fields = has_array_fields
+        self.timecols = timecols
+        self.replace_dots = replace_dots
 
     def __call__(self, f):
-        df = pd.read_csv(f, dtype=self.dtype, parse_dates=False)
+        df = pd.read_csv(f, dtype=self.dtypes, parse_dates=False, compression='gzip')
         df.columns = ['.'.join(c.split('.')[1:]) for c in df.columns]
         for c, processor in self.column_processors.items():
             df[c] = processor(df[c])
+        for c in self.timecols:
+            df[c] = date_parser(df[c])
         if self.has_array_fields:
             df = _melt_array_fields(df)
         index = choose_index(df.columns)
         if index:
             df = df.set_index(index)
+        if self.replace_dots:
+            df.columns = [c.replace('.', '_') for c in df.columns]
+
         return df
 
 
@@ -39,8 +46,10 @@ def choose_index(columns):
 
 def find_array_columns(columns):
     def is_array_column(c):
-        if len(c.split('.')) > 2:
-            return True
+        c_split = c.split('.')
+        if len(c_split) > 2:
+            if c_split[-2].isdigit():
+                return True
         return False
     id_vars = []
     arr_vars = []
@@ -67,27 +76,23 @@ def _melt_array_fields(df):
             melt[col] = data
         return melt
     id_vars, arr_vars = find_array_columns(df.columns)
-    if any(id_vars):
+    if any(id_vars) and any(arr_vars):
         df = pd.concat([melt_row(df[i:i+1], id_vars)
                         for i in range(len(df))], sort=True)
     return df
 
 
 def date_parser(series):
-    """Convert an array of floats or a string to a datetime object.
+    """Convert an array of floats or strings to a datetime object.
     Params:
-        series (np.ndarray[float], str)
+        series (pd.Series[float/str])
     Returns:
         np.ndarray[M8[ns]] / datetime.datetime
     """
-    if isinstance(series, np.ndarray):
-        ts = (series * 1e9).astype('M8[ns]')
-    elif isinstance(series, np.float64):
-        ts = datetime.fromtimestamp(series)
-    elif isinstance(series, str):
-        ts = dateutil.parser.parse(series)
-    return ts
-
+    series = series.values
+    if series.dtype == 'float':
+        return (series * 1e9).astype('M8[ns]')
+    return pd.to_datetime(series)
 
 def is_numeric(series):
     """ Checks whether pandas series dtype is a float or integer.

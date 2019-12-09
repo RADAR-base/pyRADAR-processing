@@ -7,10 +7,12 @@ from collections.abc import MutableMapping, KeysView, ItemsView, ValuesView
 from datetime import datetime
 from fsspec import filesystem
 from fsspec.utils import infer_storage_options
+import numpy as np
 import pandas as pd
 import dask.dataframe as dd
-from .util.specifications import specifications
-from .util.schemas import schemas
+from dask import delayed
+from .defaults import schemas, specifications
+from .io.radar import RadarCsvReader
 
 
 class RadarObject(MutableMapping):
@@ -21,9 +23,12 @@ class RadarObject(MutableMapping):
     def __init__(self, path, populate=False, parent=None, name=None, **kwargs):
         self.parent = parent
         self._subobject_class = RadarObject
+        fs = kwargs.get('fs')
         specs = infer_storage_options(path)
         self.path = specs.pop('path')
-        self.fs = filesystem(**specs)
+        if fs is None:
+            fs = filesystem(**specs)
+        self.fs = fs
         self.path = self.fs.info(self.path)['name']
         self.name = name if name else self.path.split(self.fs.sep)[-1]
         self.store = dict()
@@ -38,9 +43,10 @@ class RadarObject(MutableMapping):
         paths = self._list_subobjects()
         for p in paths:
             if p['type'] == 'directory':
-                basename = p['name'].split(self.fs.sep)[-1]
+                name = p['name'].rstrip(self.fs.sep)
+                basename = name.split(self.fs.sep)[-1]
                 self.store[basename] = \
-                    self._subobject_class(p['name'], parent=self)
+                    self._subobject_class(name, parent=self, fs=self.fs)
         self._populated = True
 
     def __setitem__(self, key, val):
@@ -223,21 +229,39 @@ class ParticipantValuesView(KeysView):
 
 class RadarData():
     def __init__(self, path, parent=None, name=None, *args, **kwargs):
+        self.schema = None
         self.parent = parent
-        self.files = kwargs.pop('files', None)
+        self._files = kwargs.pop('files', None)
         specs = infer_storage_options(path)
         self.path = specs.pop('path')
-        self.fs = filesystem(**specs)
+        fs = kwargs.get('fs')
+        if fs is None:
+            fs = filesystem(**specs)
+        self.fs = fs
         self.name = name if name else self.path.split(self.fs.sep)[-1]
         self.specification = kwargs.get('specification',
                                         specifications.get(self.name))
         if self.specification is not None:
-            self.schema = schemas.get(self.specification.value_schema)
+            self.schema = schemas.get('org.radarcns' +
+                                      self.specification.value_schema)
+        dtypes = self.schema.dtypes if self.schema is not None else {}
+        timecols = self.schema.timecols if self.schema is not None else []
+        self.reader = RadarCsvReader(dtypes=dtypes, timecols=timecols)
 
     def _populate_files(self):
-        files = [self.fs.open(f)
-                 for f in self.fs.glob(self.path + self.fs.sep + '*.csv.gz')]
-        self.files = files
+        files = self.fs.listdir(self.path)
+        files.sort(key=lambda x: x['name'])
+        self._files = [f for f in files if f['type'] == 'file' and
+                       (f.__setitem__('basename',
+                                      f['name'].split(self.fs.sep)[-1])
+                        is None) and
+                       f['name'][-6:] == 'csv.gz']
+
+    @property
+    def files(self):
+        if self._files is None:
+            self._populate_files()
+        return self._files
 
     def __getitem__(self, key):
         if isinstance(key, slice):
@@ -254,29 +278,41 @@ class RadarData():
         start = float('-inf') if start is None else to_ts(start)
         end = float('+inf') if end is None else to_ts(end)
         return self._subset([f for f in self.files if
-                             meets_cond(fsfilename_date)])
+                             meets_cond(filename_to_epoch(f['basename']))])
+
+    def between_mtime(self, start=None, end=None):
+        def meets_cond(epoch):
+            return start < epoch < end
+        start = float('-inf') if start is None else to_ts(start)
+        end = float('+inf') if end is None else to_ts(end)
+        return self._subset([f for f in self.files if
+                             meets_cond(f['mtime'])])
 
     def _subset(self, files):
-        return RadarData(self.path, self.parent, self.name, files=files)
+        return RadarData(self.path, self.parent, self.name, files=files, fs=self.fs)
 
     def to_dask_dataframe(self):
-        return dd.DataFrame()
-
-    def to_pyarrow(self):
-        pass
+        dread = delayed(self.reader)
+        divisions = [fsfilename_date(f) for f in self.files]
+        divisions.append(divisions[-1] + 3600)
+        divisions = (np.array(divisions) * 1e9).astype('M8[ns]')
+        return dd.from_delayed([dread(self.fs.open(f['name']))
+                                for f in self.files],
+                               divisions=divisions)
 
     def to_pandas(self):
-        return self.to_dask_dataframe.compute()
+        return pd.concat([self.reader(self.fs.open(f['name']))
+                          for f in self.files])
 
     def to_numpy(self):
-        return self.to_dask_dataframe.compute().values
+        return self.to_pandas().values
 
 
 def filename_to_epoch(fn):
     return datetime.strptime(fn[:13], '%Y%m%d_%H%M').timestamp()
 
 
-def fn_from_fsspec(f, sep):
+def fn_from_fsspec(f):
     return f.details['name'].split(f.fs.sep)[-1]
 
 
@@ -286,4 +322,9 @@ def fsfilename_date(f):
 
 
 def to_ts(timestamp_like):
+    if isinstance(timestamp_like, float):
+        if timestamp_like > 1e17:
+            return timestamp_like / 1e9
+        else:
+            return timestamp_like
     return pd.Timestamp(timestamp_like).value / 1e9

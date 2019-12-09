@@ -6,6 +6,7 @@ import glob
 import numpy as np
 import pandas as pd
 import avro.schema
+import fsspec
 from ..defaults import config, schemas
 
 from functools import lru_cache
@@ -25,7 +26,7 @@ AVRO_NP_TYPES = {
 DATETIME_FIELDS = {'time', 'timeReceived', 'dateTime'}
 TIMEDELTA_FIELDS = {'duration'}
 
-BLANK_KEY = {"namespace": "NoKey", "fields": []}
+_NAMES = avro.schema.Names()
 
 
 def _cache(cls):
@@ -72,10 +73,16 @@ class SchemaField():
                     return 'Int64'
                 elif list_dtype[0] == 'boolean':
                     return 'object'
+                elif isinstance(dtype.schemas[1], avro.schema.ArraySchema):
+                    return AVRO_NP_TYPES.get(dtype.schemas[1].items.type)
                 else:
                     return AVRO_NP_TYPES.get(list_dtype[0])
+            else:
+                return None
         elif isinstance(dtype, avro.schema.EnumSchema):
             return pd.api.types.CategoricalDtype(dtype.symbols)
+        elif isinstance(dtype, avro.schema.ArraySchema):
+            return AVRO_NP_TYPES.get(dtype.items.type)
         return AVRO_NP_TYPES.get(dtype.type)
     def __init__(self, field: avro.schema.Field):
         self.avro = field
@@ -105,74 +112,43 @@ def parse_schema_fields(schema: avro.schema.RecordSchema, namespace=''):
         if rec:
             out.update(parse_schema_fields(rec, name + '.'))
         elif arr:
-            out.update(parse_schema_fields(arr.items, name + '.\d+.'))
+            if isinstance(arr.items, avro.schema.RecordSchema):
+                out.update(parse_schema_fields(arr.items, name + '.\d+.'))
+            else:
+                out[name + '.\d+'] = SchemaField(field)
         else:
             out[name] = SchemaField(field)
     return out
 
 
-def schema_from_value_or_schema(schema_json, key_json=None):
-    if schema_json['doc'] == 'combined key-value record':
-        schema = schema_json
-    else:
-        if key_json is None:
-            key_json = BLANK_KEY
-        schema = combine_key_value_schemas(key_json, schema_json)
-    return schema
+def schemas_from_commons(path, names=_NAMES):
+    out: Dict[str, RadarSchema] = {}
+    excp_schemas = []
+    spec = fsspec.utils.infer_storage_options(path)
+    path = spec.pop('path')
+    fs = fsspec.filesystem(**spec)
+    schema_paths = fs.glob(path + fs.sep + '**.avsc')
+    for path in schema_paths:
+        try:
+            scm = schema_from_file(path, names=names)
+            if scm is not None:
+                out[scm.avro.fullname] = scm
+        except avro.schema.SchemaParseException as exc:
+            excp_schemas.append(path)
+    for path in excp_schemas:
+        scm = schema_from_file(path, names=names)
+        if scm is not None:
+            out[scm.avro.fullname] = scm
+    return out
 
 
-def combine_key_value_schemas(key_json, value_json):
-    """ Combined a RADAR key schema and a RADAR value schema.
-    Needs cleaning
-    Parameters
-    __________
-    key_schema: dict
-        The json dict representation of a RADAR key schema. By default
-        observation_key
-    value_json: dict
-        The json dict representation of a RADAR value schema.
-    """
-    schema_json = {
-            'type': 'record',
-            'name': value_json['name'],
-            'namespace': '{}_{}'.format(key_json['namespace'],
-                                        value_json['namespace']),
-            'doc': 'combined key-value record',
-            'fields': [
-                    {'name': 'key',
-                     'type': key_json,
-                     'doc': 'Key of a Kafka SinkRecord'},
-                    {'name': 'value',
-                     'type': value_json,
-                     'doc': 'Value of a Kafka SinkRecord'},
-                ],
-            }
-    return schema_json
-
-
-def schemas_from_commons(path, key_path=None):
-    schema_paths = glob.glob(path + '/**/*.avsc', recursive=True)
-    schemas = []
-    names = []
-    whitelist = ('passive', 'connector', 'monitor')
-    for sp in schema_paths:
-        if os.path.relpath(sp, path).split(os.path.sep)[0] not in whitelist:
-            continue
-        name = os.path.basename(sp).split('.')[0]
-        if 'passive' in sp:
-            name = config.schema.device + '_' + name
-        names.append(name)
-        schemas.append(schema_from_file(sp, key_path))
-    return {name: scm for name, scm in zip(names, schemas)}
-
-
-def schema_from_file(path, key_path=None):
-    with open(path) as vf:
-        scm_json = json.loads(vf.read())
-    if key_path:
-        with open(key_path) as kf:
-            key_json = json.loads(kf.read())
-    else:
-        key_json = None
-    return RadarSchema(scm_json, key_json=key_json)
-
+def schema_from_file(f, names=_NAMES):
+    with open(f) as of:
+        data = json.load(of)
+    try:
+        avro_scm = avro.schema.SchemaFromJSONData(data, names=names)
+    except avro.schema.SchemaParseException as exc:
+        del names.names[data['namespace'] + '.' + data['name']]
+        raise exc
+    if isinstance(avro_scm, avro.schema.RecordSchema):
+        return RadarSchema(avro_scm)

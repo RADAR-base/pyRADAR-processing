@@ -5,6 +5,7 @@ protocols, and definitions.
 import os
 import collections
 import yaml
+
 schemas = {}
 specifications = {}
 protocols = {}
@@ -35,34 +36,34 @@ class Config(dict):
 
 
 config = Config()
-config.aRMT = {}
-config.io = {}
-config.log = {}
-config.log.to_file = None
-config.log.format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-config.protocol = {}
-config.schema = {}
-config.specifications = {}
-config.project = {}
-config.schema.device = 'android'
-config.schema.key = None
-config.schema.dir = _DEF_RADAR_SCHEMA_PATH
-config.schema.git = False
-config.schema.github_owner = 'RADAR-base'
-config.schema.github_repo = 'RADAR-Schemas'
-config.schema.github_sha = None
-config.schema.read_csvs = True
-config.schema.from_local_file = False
-config.schema.local_file_regex = '.*schema.*json'
-config.specifications.dir = _DEF_RADAR_SPECS_PATH
-config.specifications.git = False
-config.specifications.github_owner = 'RADAR-base'
-config.specifications.github_repo = 'RADAR-Schemas'
-config.specifications.github_sha = 'extended-specs'
-config.io.index = 'time'
-config.protocol.url = ''
-config.project.ptckw = {}
-config.project.datakw = {}
+config['aRMT'] = Config()
+config['io'] = Config()
+config['log'] = Config()
+config['log']['to_file'] = None
+config['log']['format'] = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+config['protocol'] = Config()
+config['schema'] = Config()
+config['specifications'] = Config()
+config['project'] = Config()
+config['schema']['device'] = 'android'
+config['schema']['key'] = None
+config['schema']['dir'] = _DEF_RADAR_SCHEMA_PATH
+config['schema']['git'] = False
+config['schema']['github_owner'] = 'RADAR-base'
+config['schema']['github_repo'] = 'RADAR-Schemas'
+config['schema']['github_sha'] = None
+config['schema']['read_csvs'] = True
+config['schema']['from_local_file'] = False
+config['schema']['local_file_regex'] = '.*schema.*json'
+config['specifications']['dir'] = _DEF_RADAR_SPECS_PATH
+config['specifications']['git'] = False
+config['specifications']['github_owner'] = 'RADAR-base'
+config['specifications']['github_repo'] = 'RADAR-Schemas'
+config['specifications']['github_sha'] = 'extended-specs'
+config['io']['index'] = 'time'
+config['protocol']['url'] = ''
+config['project']['ptckw'] = {}
+config['project']['datakw'] = {}
 
 
 def update(d, u):
@@ -86,3 +87,14 @@ if os.path.exists(_CONFIG_DEFAULT_FILE):
 if 'config.yml' in os.listdir():
     with open('config.yml', 'r') as f:
         update(config, yaml.load(f, Loader=yaml.FullLoader))
+
+if config.schema.dir:
+    from radar.util.schemas import schemas_from_commons
+    schemas.update(schemas_from_commons(config.schema.dir))
+
+if config.specifications.dir:
+    from radar.util.specifications import specifications_from_directory
+    specifications.update(specifications_from_directory())
+elif config.specifications.git:
+    from radar.util.specifications import specifications_from_github
+    specifications.update(specifications_from_github())
