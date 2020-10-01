@@ -20,20 +20,22 @@ class RadarCsvReader():
         self.replace_dots = replace_dots
 
     def __call__(self, f):
-        df = pd.read_csv(f, dtype=self.dtypes, parse_dates=False, compression='gzip')
+        df = pd.read_csv(f, dtype=self.dtypes,
+                         parse_dates=False, compression='gzip')
         df.columns = ['.'.join(c.split('.')[1:]) for c in df.columns]
         for c, processor in self.column_processors.items():
             df[c] = processor(df[c])
-        for c in self.timecols:
-            df[c] = date_parser(df[c])
         if self.has_array_fields:
             df = _melt_array_fields(df)
+        for c in self.timecols:
+            df[c] = date_parser(df[c])
         index = choose_index(df.columns)
         if index:
             df = df.set_index(index)
+        if 'userId' in df.columns:
+            df['userId'] = df['userId'].apply(lambda x: x[:36])
         if self.replace_dots:
             df.columns = [c.replace('.', '_') for c in df.columns]
-
         return df
 
 
@@ -62,14 +64,19 @@ def find_array_columns(columns):
 
 
 def _melt_array_fields(df):
+    def field_name(x):
+        x.pop(-2)
+        return '.'.join(x)
+
     def melt_row(row, ids):
         melt = row.melt(id_vars=ids)
         melt['arrid'] = [(lambda x: x[-2])(x)
                          for x in melt['variable'].str.split('.')]
-        melt['field'] = [(lambda x: x[-1])(x)
+        melt['field'] = [field_name(x)
                          for x in melt['variable'].str.split('.')]
         col_data = [(x[0], x[1]['value'].values)
                     for x in melt.groupby('field')]
+        col_data.append(('arrid', melt[melt['field'] == melt['field'][0]]['arrid'].values))
         melt = pd.DataFrame([x[1][ids].iloc[0] for x in melt.groupby('arrid')])
         melt = melt.reset_index(drop=True)
         for col, data in col_data:
@@ -90,9 +97,12 @@ def date_parser(series):
         np.ndarray[M8[ns]] / datetime.datetime
     """
     series = series.values
+    if type(series[0]) == float:
+        series = series.astype(float)
     if series.dtype == 'float':
         return (series * 1e9).astype('M8[ns]')
     return pd.to_datetime(series)
+
 
 def is_numeric(series):
     """ Checks whether pandas series dtype is a float or integer.

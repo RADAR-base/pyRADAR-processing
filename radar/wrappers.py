@@ -229,7 +229,6 @@ class ParticipantValuesView(KeysView):
 
 class RadarData():
     def __init__(self, path, parent=None, name=None, *args, **kwargs):
-        self.schema = None
         self.parent = parent
         self._files = kwargs.pop('files', None)
         specs = infer_storage_options(path)
@@ -239,13 +238,15 @@ class RadarData():
             fs = filesystem(**specs)
         self.fs = fs
         self.name = name if name else self.path.split(self.fs.sep)[-1]
-        self.specification = kwargs.get('specification',
+        schema = None
+        specification = kwargs.get('specification',
                                         specifications.get(self.name))
-        if self.specification is not None:
-            self.schema = schemas.get('org.radarcns' +
-                                      self.specification.value_schema)
-        dtypes = self.schema.dtypes if self.schema is not None else {}
-        timecols = self.schema.timecols if self.schema is not None else []
+        if specification is not None:
+            schema = schemas.get('org.radarcns' +
+                                 specification.value_schema)
+        dtypes = schema.dtypes if schema is not None else {}
+        timecols = schema.timecols if schema is not None else []
+        self.schema = schema
         self.reader = RadarCsvReader(dtypes=dtypes, timecols=timecols)
 
     def _populate_files(self):

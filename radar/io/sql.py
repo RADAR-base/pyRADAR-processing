@@ -2,9 +2,9 @@
 Currently unsafe / doesn't sanatize inputs. Should work in psycopg2 2.8
 """
 import time
-from typing import Callable, Union, Any, List
+from typing import Callable, Union, Any, List, Tuple
 from io import StringIO
-from functools import wraps
+from functools import wraps, partial
 from itertools import chain
 
 import psycopg2
@@ -12,7 +12,7 @@ from psycopg2.extensions import connection as Connection
 from psycopg2.pool import AbstractConnectionPool
 
 import pandas as pd
-from ..common import log
+from ..log import log
 
 
 class PostgresIOPool():
@@ -49,12 +49,12 @@ class PostgresIOPool():
         Args:
             table (str): table name
         """
-        conn = self.pool.getconnO()
+        conn = self.pool.getconn()
         drop_table(conn, table)
 
     def upsert_from_table(self, source_table: str,
                           target_table: str, columns: List[str],
-                          constraints: List[str] = ('userid', 'time')) -> None:
+                          constraints: Tuple[str] = ('userid', 'time')) -> None:
         """ Copy between tables and upsert all columns.
         Currently potentially unsafe - doesn't sanitize table or
         column names - should be fixed once psycopg2 2.8 comes out
@@ -159,7 +159,7 @@ def drop_table(conn: Connection, table: str):
 @try_sql
 def upsert_from_table(conn, source_table: str, target_table: str,
                       columns: List[str],
-                      constraints: List[str] = ('userid', 'time')) -> None:
+                      constraints: List[str] = ['userid', 'time']) -> None:
     """ Copy between tables and upsert all columns.
     Currently potentially unsafe - doesn't sanitize table or
     column names - should be fixed once psycopg2 2.8 comes out
@@ -189,7 +189,7 @@ def upsert_from_table(conn, source_table: str, target_table: str,
 
 
 def df_upsert_psql(conn: Connection, table: str, df: pd.DataFrame,
-                   constraints: List[str] = ('userid', 'time')) -> None:
+                   constraints: List[str] = ['userid', 'time']) -> None:
     """ Upsert a Dataframe into a Postgres table through:
     DataFrame -> StringIO -> Temp table -> table
     Args:
@@ -197,9 +197,12 @@ def df_upsert_psql(conn: Connection, table: str, df: pd.DataFrame,
         table (str): Table to upsert data into
         df (pd.DataFrame): Dataframe containing data to upsert from
     """
-    df = df.reset_index()\
-        .drop_duplicates(subset=constraints)\
-        .set_index(df.index.name)
+    idx_name = df.index.name
+    if idx_name:
+        df = df.reset_index()
+    df = df.drop_duplicates(subset=constraints)
+    if idx_name:
+        df = df.set_index(idx_name)
     columns = [df.index.name] + list(df.columns)
     curr_time = str(time.time()).replace('.', '_')
     tmp_table = table + '_staging_' + curr_time
@@ -211,6 +214,15 @@ def df_upsert_psql(conn: Connection, table: str, df: pd.DataFrame,
         drop_table(conn, tmp_table)
 
 
+def df_upsert_with_pool(pool, table, df, constraints):
+    conn = pool.getconn()
+    try:
+        df_upsert_psql(conn, table, df, constraints)
+    finally:
+        conn.close()
+        pool.putconn(conn)
+
+
 def dask_upsert_psql(pool, table, ddf, constraints=('userid', 'time')):
     """ Upsert a dask dataframe into SQL table
     Args:
@@ -220,11 +232,6 @@ def dask_upsert_psql(pool, table, ddf, constraints=('userid', 'time')):
     Returns:
         Dask delayed object
     """
-    def upsert_with_pool(df):
-        conn = pool.getconn()
-        try:
-            df_upsert_psql(conn, table, df, constraints)
-        finally:
-            conn.close()
-            pool.putconn(conn)
+    upsert_with_pool = partial(df_upsert_with_pool, pool=pool,
+                               constraints=constraints, table=table)
     return ddf.map_partitions(upsert_with_pool, meta=(None, None))
