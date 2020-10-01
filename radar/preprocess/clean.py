@@ -4,10 +4,10 @@ from functools import wraps
 import numpy as np
 import pandas as pd
 from . import validators
-from ..generic import FunctionRegistry
+from ..generic import Registry
 
 
-CLEANERS = FunctionRegistry()
+CLEANERS = Registry()
 
 
 def last(x):

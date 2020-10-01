@@ -31,7 +31,8 @@ def questionnaire_phq8(df: pd.DataFrame) -> pd.Series:
     Returns:
         pd.Series[bool]
     """
-    valid = (df['value'].astype(int) <= 3) & (df['value'].astype(int) >= 0)
+    valid = ((df['answers_value'].astype(int) <= 3) &
+             (df['answers_value'].astype(int) >= 0))
     valid.loc[df.groupby(df.index).apply(len) != 8] = False
     return valid
 
@@ -46,7 +47,8 @@ def questionnaire_rses(df: pd.DataFrame) -> pd.Series:
         pd.Series[bool]
 
     """
-    valid = (df['value'].astype(int) <= 3) & (df['value'].astype(int) >= 0)
+    valid = ((df['answers_value'].astype(int) <= 3) &
+             (df['answers_value'].astype(int) >= 0))
     valid.loc[df.groupby(df.index).apply(len) != 10] = False
     return valid
 
