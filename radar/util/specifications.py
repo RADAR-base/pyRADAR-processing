@@ -3,7 +3,9 @@ import glob
 import yaml
 import requests
 from collections import OrderedDict
-from ..defaults import config, schemas, specifications
+from packaging import version
+from ..defaults import config
+
 
 class ProjectSpecs(dict):
     """
@@ -45,7 +47,7 @@ class DeviceSpec(dict):
             if not hasattr(self, attr):
                 setattr(self, attr, '')
 
-        self.name = '_'.join((self.vendor, self.model, self.version))
+        self.name = '_'.join((self.vendor, self.model))
 
         super(DeviceSpec, self).__init__([(mdl['topic'], ModalitySpec(mdl))
               for mdl in yml['data'] if ('data' in yml and 'topic' in mdl)])
@@ -84,17 +86,11 @@ class ModalitySpec(dict):
     def timedeltas(self):
         return self._type_columns('DURATION')
 
-    def dtype(self):
-        raise NotImplementedError
-
 
 class FieldSpec(OrderedDict):
     """
     A class to store fields of modalities in RADAR specifications.
     """
-    def __init__(self, field:dict):
-        super(FieldSpec, self).__init__(field)
-
     def __repr__(self):
         repr_string = '"{}" field: (({}))'.format(self['name'],
                 '), ('.join([': '.join((k, v)) for k, v in self.items()]))
@@ -103,20 +99,23 @@ class FieldSpec(OrderedDict):
 
 def specifications_from_directory(path=config.specifications.dir):
     files = glob.glob(path + '/**/*.yml', recursive=True)
-    ymls = []
+    device_specs = {}
     for fn in files:
         with open(fn) as f:
-            ymls.append(yaml.load(f, yaml.SafeLoader))
-    return ProjectSpecs([DeviceSpec(y) for y in ymls])
+            spec = DeviceSpec(yaml.load(f, yaml.SafeLoader))
+        if (spec.name not in device_specs or
+                (version.parse(spec.version) >
+                 version.parse(device_specs[spec.name].version))):
+            device_specs[spec.name] = spec
+    return ProjectSpecs(device_specs.values())
 
-def specifications_from_github(repo_owner=config.specifications.github_owner,
-                               repo_name=config.specifications.github_repo,
-                               sha=config.specifications.github_sha):
+
+def specifications_from_github(repo_owner, repo_name, sha):
     url = 'https://api.github.com/repos/{}/{}/contents/specifications/'\
-            .format(repo_owner, repo_name)
+        .format(repo_owner, repo_name)
 
     rawurl = 'https://raw.githubusercontent.com/{}/{}/{}/'\
-            .format(repo_owner, repo_name, sha)
+        .format(repo_owner, repo_name, sha)
 
     def ls(relpath):
         requrl = url + relpath

@@ -97,6 +97,7 @@ class RedcapMDD():
             info[sid] = {}
             info[sid]['record_id'] = r.iloc[0]['record_id']
             for cat, fields in INFO:
+                fields = r.columns.intersection(fields)
                 info[sid][cat] = r.iloc[0][fields].to_dict()
         return info
 

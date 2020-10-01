@@ -103,8 +103,13 @@ class Protocol(object):
         return self.get_definition(commit=sha)
 
     def protocol_timedelta(self):
-        return pd.Timedelta('{} {}'.format(self.repeat_protocol.amount,
-                                           self.repeat_protocol.unit))
+        amount = self.repeat_protocol.amount
+        unit = self.repeat_protocol.unit
+        if unit == 'week':
+            unit = 'W'
+        elif unit == 'year':
+            unit = 'W'
+        return pd.Timedelta('{} {}'.format(amount, unit))
 
     def questionnaire_timedeltas(self):
         return pd.Series([pd.Timedelta('{} {}'\

@@ -8,8 +8,9 @@ import pandas as pd
 import avro.schema
 import fsspec
 from ..defaults import config, schemas
-
+import collections
 from functools import lru_cache
+
 
 AVRO_NP_TYPES = {
     'null': 'object',
@@ -22,23 +23,13 @@ AVRO_NP_TYPES = {
     'string': 'object',
     'enum': 'object',
 }
-
-DATETIME_FIELDS = {'time', 'timeReceived', 'dateTime'}
+DATETIME_FIELDS = {'time', 'timeReceived', 'dateTime', 'timeCompleted',
+                    'timeNotification',
+                   'answers.\d+.startTime', 'answers.\d+.endTime'}
 TIMEDELTA_FIELDS = {'duration'}
-
 _NAMES = avro.schema.Names()
 
 
-def _cache(cls):
-    cache = {}
-    def wrapper(scm):
-        if scm.name not in cache:
-            cache[scm.name] = cls(scm)
-        return cache[scm.name]
-    return wrapper
-
-
-@_cache
 class RadarSchema():
     def _get_timedelta_columns(self):
         def get_dtype(doc):
@@ -52,15 +43,37 @@ class RadarSchema():
                 for name, field in self.fields.items()
                 if 'duration' in name.lower()
                 or 'interval' in name.lower()}
-    def __init__(self, avro_schema: avro.schema.RecordSchema):
-        self.avro = avro_schema
-        self.fields = parse_schema_fields(avro_schema)
+
+    def __init__(self, fullname, name, namespace, fields):
+        self.fullname = fullname
+        self.name = name
+        self.namespace = namespace
+        self.fields = fields
         field_names = set(self.fields)
-        self.timecols = field_names.intersection(DATETIME_FIELDS)
+        self.timecols = [drop_arrid(name) for name in
+                         field_names.intersection(DATETIME_FIELDS)]
         self.timedeltas = self._get_timedelta_columns()
         self.dtypes = {'value.' + k: v.nptype for k, v in self.fields.items()
                        if v.nptype is not None}
 
+    def __eq__(self, other):
+        if isinstance(other, RadarSchema):
+            return (self.fields == other.fields and
+                    self.fullname == other.fullname)
+        return False
+
+    def from_avro(avro_schema: avro.schema.RecordSchema):
+        fullname = avro_schema.fullname
+        name = avro_schema.name
+        namespace = avro_schema.namespace
+        fields = parse_schema_fields(avro_schema)
+        return RadarSchema(fullname=fullname, name=name,
+                           namespace=namespace, fields=fields)
+
+
+def drop_arrid(name):
+    spl = [s for s in name.split('.') if s != '\d+']
+    return '.'.join(spl)
 
 class SchemaField():
     def convert_type(self, dtype):
@@ -75,6 +88,9 @@ class SchemaField():
                     return 'object'
                 elif isinstance(dtype.schemas[1], avro.schema.ArraySchema):
                     return AVRO_NP_TYPES.get(dtype.schemas[1].items.type)
+                elif isinstance(dtype.schemas[1], avro.schema.EnumSchema):
+                    symbols = dtype.schemas[1].symbols
+                    return pd.api.types.CategoricalDtype(symbols)
                 else:
                     return AVRO_NP_TYPES.get(list_dtype[0])
             else:
@@ -132,13 +148,13 @@ def schemas_from_commons(path, names=_NAMES):
         try:
             scm = schema_from_file(path, names=names)
             if scm is not None:
-                out[scm.avro.fullname] = scm
+                out[scm.fullname] = scm
         except avro.schema.SchemaParseException as exc:
             excp_schemas.append(path)
     for path in excp_schemas:
         scm = schema_from_file(path, names=names)
         if scm is not None:
-            out[scm.avro.fullname] = scm
+            out[scm.fullname] = scm
     return out
 
 
@@ -151,4 +167,4 @@ def schema_from_file(f, names=_NAMES):
         del names.names[data['namespace'] + '.' + data['name']]
         raise exc
     if isinstance(avro_scm, avro.schema.RecordSchema):
-        return RadarSchema(avro_scm)
+        return RadarSchema.from_avro(avro_scm)
